@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+Unity ↔ Python bridge server for hand gesture inference.
+
+Receives landmark frames as newline-delimited JSON objects over TCP,
+runs them through the RealtimeEnhancedDetector, and streams back the
+latest prediction as JSON.
+"""
+
+import json
+import socket
+import sys
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import torch
+
+ROOT = Path(__file__).parent.resolve()
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.append(str(SRC_DIR))
+
+from realtime_enhanced import RealtimeEnhancedDetector  # noqa: E402
+from models.bilstm_trend import build_bilstm_trend_model  # noqa: E402
+
+
+HOST = "127.0.0.1"
+PORT = 50007
+BUFFER_SIZE = 4096
+
+
+def load_detector(
+    checkpoint_path: Path,
+    label_map_path: Optional[Path] = None,
+) -> RealtimeEnhancedDetector:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    feature_dim = checkpoint.get("feature_dim", 20)
+    num_classes = checkpoint.get("num_classes")
+
+    if label_map_path is None:
+        label_map_path = checkpoint_path.parent.parent / "label_map.json"
+        if not label_map_path.exists():
+            label_map_path = ROOT / "artifacts" / "label_map.json"
+
+    if not label_map_path.exists():
+        raise FileNotFoundError(f"Label map not found at {label_map_path}")
+
+    with open(label_map_path, "r", encoding="utf-8") as f:
+        label_map = json.load(f)
+    label_map = {int(k): v for k, v in label_map.items()}
+
+    if num_classes is None:
+        num_classes = len(label_map)
+
+    model = build_bilstm_trend_model(input_dim=feature_dim, num_classes=num_classes)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model = model.to(device)
+    model.eval()
+
+    detector = RealtimeEnhancedDetector(
+        model=model,
+        label_map=label_map,
+        device=device,
+    )
+    return detector
+
+
+def handle_client(conn: socket.socket, detector: RealtimeEnhancedDetector) -> None:
+    buffer = b""
+    file = conn.makefile("rwb")
+    print("Client connected.")
+
+    try:
+        while True:
+            chunk = file.readline()
+            if not chunk:
+                print("Client disconnected.")
+                break
+
+            line = chunk.decode("utf-8").strip()
+            if not line:
+                continue
+
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"Invalid JSON received: {line}")
+                continue
+
+            if payload.get("command") == "stop":
+                detector.feature_buffer.clear()
+                continue
+
+            landmarks = np.array(payload.get("landmarks", []), dtype=np.float32)
+            if landmarks.size != 63:  # 21 landmarks * 3 coords
+                continue
+
+            result = detector.process_frame(landmarks)
+            top1_label = "none"
+            top1_prob = 0.0
+
+            if result["top3_classes"]:
+                cls_id = int(result["top3_classes"][0])
+                top1_label = detector.label_map.get(cls_id, str(cls_id))
+                top1_prob = float(result["top3_probs"][0])
+
+            response = {
+                "top1": top1_label,
+                "prob": top1_prob,
+                "confidence": float(result["model_confidence"]),
+            }
+            file.write((json.dumps(response) + "\n").encode("utf-8"))
+            file.flush()
+    finally:
+        file.close()
+        conn.close()
+        print("Closed connection.")
+
+
+def main() -> None:
+    ckpt = ROOT / "artifacts" / "checkpoints" / "best.pt"
+    detector = load_detector(ckpt)
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST, PORT))
+        server.listen(1)
+        print(f"Gesture server listening on {HOST}:{PORT}")
+
+        while True:
+            conn, _ = server.accept()
+            try:
+                handle_client(conn, detector)
+            except Exception as exc:
+                print(f"Error while handling client: {exc}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,9 @@
+timestamp: 2025-10-15 00:44:36
+prediction_1: gesture_1
+probability_1: 0.9964
+prediction_2: gesture_3
+probability_2: 0.0018
+prediction_3: gesture_4
+probability_3: 0.0011
+confidence: 0.4847
+status: low

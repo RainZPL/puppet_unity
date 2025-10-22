@@ -1,2 +1,17 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+* text=auto eol=lf
+Packages/com.github.homuler.mediapipe/Runtime/Plugins/Android/mediapipe_android.aar filter=lfs diff=lfs merge=lfs -text
+
+# 对于 Windows 专用脚本（如果你有 .bat 文件）可强制 CRLF
+*.bat text eol=crlf
+
+# 对于 Unity 项目中常见的文本资源，强制 LF
+*.unity text eol=lf
+*.asset text eol=lf
+*.prefab text eol=lf
+*.meta text eol=lf
+
+# 二进制文件不要转换行结束符
+*.png binary
+*.jpg binary
+*.fbx binary
