@@ -17,10 +17,7 @@ ModelImporter:
     removeConstantScaleCurves: 0
     motionNodeName: 
     animationImportErrors: 
-    animationImportWarnings: "\nClip 'root|rig\u52A8\u4F5C' has import animation
-      warnings that might lower retargeting quality:\nNote: Activate translation
-      DOF on avatar to improve retargeting quality.\n\t'neck.x' has translation animation
-      that will be discarded.\n"
+    animationImportWarnings: 
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -175,8 +172,7 @@ ModelImporter:
     - name: arm_twist.l
       parentName: arm_stretch.l
       position: {x: 0.000000010430813, y: -0.00000010550022, z: -0.00000002130866}
-      rotation: {x: -0.000000029802322, y: -0.00000032782555, z: -0.000000018626451,
-        w: 1}
+      rotation: {x: -0.000000029802322, y: -0.00000032782555, z: -0.000000018626451, w: 1}
       scale: {x: 0.9999997, y: 1.000001, z: 1.0000002}
     - name: forearm_stretch.l
       parentName: arm_stretch.l
@@ -201,8 +197,7 @@ ModelImporter:
     - name: thigh_twist.l
       parentName: thigh_stretch.l
       position: {x: -0.0000000166893, y: 0.00000004649162, z: 0.000000007152557}
-      rotation: {x: 0.000000014901159, y: -0.0000000372529, z: -0.000000014901159,
-        w: 1}
+      rotation: {x: 0.000000014901159, y: -0.0000000372529, z: -0.000000014901159, w: 1}
       scale: {x: 0.9999998, y: 1.0000004, z: 1.0000002}
     - name: leg_stretch.l
       parentName: thigh_stretch.l
@@ -222,8 +217,7 @@ ModelImporter:
     - name: leg_twist.l
       parentName: leg_stretch.l
       position: {x: 0.000000009536743, y: 0.07181434, z: 0.0000000011920929}
-      rotation: {x: 0.00000008381901, y: 0.000000049825747, z: -0.000000067784626,
-        w: 1}
+      rotation: {x: 0.00000008381901, y: 0.000000049825747, z: -0.000000067784626, w: 1}
       scale: {x: 0.99999994, y: 0.9999998, z: 0.9999995}
     - name: thigh_stretch.r
       parentName: root.x
@@ -233,8 +227,7 @@ ModelImporter:
     - name: thigh_twist.r
       parentName: thigh_stretch.r
       position: {x: 0.000000011920928, y: -0.0000000017881393, z: -0.0000000166893}
-      rotation: {x: 0.000000014901158, y: 0.00000005029141, z: -0.000000044703473,
-        w: 1}
+      rotation: {x: 0.000000014901158, y: 0.00000005029141, z: -0.000000044703473, w: 1}
       scale: {x: 1, y: 1.0000012, z: 1.0000008}
     - name: leg_stretch.r
       parentName: thigh_stretch.r
@@ -254,8 +247,7 @@ ModelImporter:
     - name: leg_twist.r
       parentName: leg_stretch.r
       position: {x: -0, y: 0.071814336, z: -0.0000000047683715}
-      rotation: {x: 0.00000012619421, y: 0.00000006193295, z: 0.0000000010768417,
-        w: 1}
+      rotation: {x: 0.00000012619421, y: 0.00000006193295, z: 0.0000000010768417, w: 1}
       scale: {x: 1.0000002, y: 1.0000004, z: 1.0000002}
     armTwist: 0.5
     foreArmTwist: 0.5
@@ -273,7 +265,7 @@ ModelImporter:
   autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
-  avatarSetup: 0
+  avatarSetup: 1
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1
   importBlendShapeDeformPercent: 1
   remapMaterialsIfMaterialImportModeIsNone: 0
