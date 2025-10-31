@@ -17,7 +17,7 @@ def main():
     if str(SRC_DIR) not in sys.path:
         sys.path.append(str(SRC_DIR))
 
-    from models.bilstm_trend import build_bilstm_trend_model  # pylint: disable=C0415
+    from models.bilstm_trend import build_bilstm_trend_model
 
     device = torch.device("cpu")
     ckpt = torch.load(CHECKPOINT, map_location=device)

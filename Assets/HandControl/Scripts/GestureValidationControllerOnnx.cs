@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
-
 using Unity.InferenceEngine;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,93 +8,66 @@ using TensorFloat = Unity.InferenceEngine.Tensor<float>;
 
 namespace HandControl
 {
-  // simple ONNX/Barracuda-based validation controller
   public class GestureValidationControllerOnnx : MonoBehaviour
   {
     [Serializable]
-    public class ButtonRef
+    public class ButtonInfo
     {
       public string label;
       public Button button;
-      public Text status;
+      public Text statusText;
     }
 
     public HandTrackingSource handSource;
-    public Text progressText;
-    public Text resultText;
-    public List<ButtonRef> buttons = new List<ButtonRef>();
+    public Text progressLabel;
+    public Text resultLabel;
+    public List<ButtonInfo> buttons = new List<ButtonInfo>();
 
     public ModelAsset modelAsset;
     public TextAsset labelMapJson;
 
-    public float windowSeconds = 5f;
-    public int minFrames = 60;
-    public float fakeFps = 30f;
-    public bool fillMissing = true;
-    public float successProb = 0.75f;
-    public float successConf = 0.5f;
-    public int modelMaxLen = 100;
-    public int modelFeatureDim = 20;
+    public float captureSeconds = 5f;
+    public int minimumFrames = 60;
+    public float pretendFps = 30f;
+    public bool allowEmptyFrames = true;
+    public float passProbability = 0.75f;
+    public float passConfidence = 0.5f;
+    public int modelMaxLength = 100;
+    public int featureCount = 20;
 
-    private readonly List<float[]> frameList = new List<float[]>();
-    private readonly List<long> frameTimes = new List<long>();
+    public Action<string> OnGestureMatched;
+    public Action OnNewSessionStarted;
 
-    private readonly Vector3[] landmarkBuffer = new Vector3[21];
-    private readonly Vector3[] normBuffer = new Vector3[21];
+    private readonly List<float[]> frameBuffer = new List<float[]>();
+    private readonly List<long> timeBuffer = new List<long>();
+    private readonly Vector3[] rawPoints = new Vector3[21];
+    private readonly Vector3[] normPoints = new Vector3[21];
 
-    private Model runtimeModel;
+    private Model model;
     private Worker worker;
-
-    private readonly List<string> labelNames = new List<string>();
+    private readonly List<string> labels = new List<string>();
     private readonly Dictionary<string, int> labelLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-    private ButtonRef activeButton;
+    private ButtonInfo activeButton;
     private string activeLabel;
-    private bool isCollecting;
-    private string progressMsg = "Not started.";
-    private string resultMsg = "Result: --";
+    private bool collecting;
+    private string progressText = "Idle";
+    private string resultText = "Result: --";
 
     private void Awake()
     {
       if (modelAsset == null)
       {
-        Debug.LogError("GestureValidationControllerOnnx: modelAsset is missing.");
+        Debug.LogError("GestureValidationControllerOnnx: missing model asset");
         enabled = false;
         return;
       }
 
-      runtimeModel = ModelLoader.Load(modelAsset);
-      try
-      {
-        worker = new Worker(runtimeModel, BackendType.GPUCompute);
-      }
-      catch (Exception ex)
-      {
-        Debug.LogWarning($"GestureValidationControllerOnnx: GPU worker failed ({ex.Message}), falling back to CPU.");
-        worker?.Dispose();
-        worker = new Worker(runtimeModel, BackendType.CPU);
-      }
-      ReadLabels();
-
-      foreach (var info in buttons)
-      {
-        if (info?.button == null)
-        {
-          continue;
-        }
-
-        var localInfo = info;
-        info.button.onClick.AddListener(() => HandleButton(localInfo));
-        SetButtonLabel(info, false);
-
-        if (info.status != null)
-        {
-          info.status.text = "Not started";
-          info.status.color = Color.white;
-        }
-      }
-
-      UpdateUi();
+      model = ModelLoader.Load(modelAsset);
+      CreateWorker();
+      LoadLabels();
+      SetupButtons();
+      RefreshUi();
     }
 
     private void OnEnable()
@@ -114,7 +85,7 @@ namespace HandControl
         handSource.OnHandFrame -= HandleHandFrame;
       }
 
-      StopCollect("Stopped", true);
+      StopCollecting("Stopped", true);
     }
 
     private void OnDestroy()
@@ -125,43 +96,91 @@ namespace HandControl
 
     private void Update()
     {
-      UpdateUi();
+      RefreshUi();
     }
 
-    private void HandleButton(ButtonRef info)
+    private void CreateWorker()
+    {
+      try
+      {
+        worker = new Worker(model, BackendType.GPUCompute);
+      }
+      catch (Exception ex)
+      {
+        Debug.LogWarning("GestureValidationControllerOnnx: GPU worker failed, using CPU. " + ex.Message);
+        worker?.Dispose();
+        worker = new Worker(model, BackendType.CPU);
+      }
+    }
+
+    private void SetupButtons()
+    {
+      foreach (var info in buttons)
+      {
+        if (info?.button == null)
+        {
+          continue;
+        }
+
+        var cached = info;
+        info.button.onClick.AddListener(() => OnButtonClicked(cached));
+        UpdateButtonLabel(info, false);
+
+        if (info.statusText != null)
+        {
+          info.statusText.text = "Not tested";
+          info.statusText.color = Color.white;
+        }
+      }
+    }
+
+    private void RefreshUi()
+    {
+      if (progressLabel != null)
+      {
+        progressLabel.text = progressText;
+      }
+
+      if (resultLabel != null)
+      {
+        resultLabel.text = resultText;
+      }
+    }
+
+    private void OnButtonClicked(ButtonInfo info)
     {
       if (info == null)
       {
         return;
       }
 
-      if (isCollecting && activeButton == info)
+      if (collecting && activeButton == info)
       {
-        StopCollect("Stopped by user", true);
+        StopCollecting("Cancelled", true);
         return;
       }
 
-      StopCollect("Setting up...", false);
-      StartCollect(info);
+      StopCollecting("Switching...", false);
+      StartCollecting(info);
     }
 
-    private void StartCollect(ButtonRef info)
+    private void StartCollecting(ButtonInfo info)
     {
       if (string.IsNullOrWhiteSpace(info.label))
       {
-        Debug.LogWarning("GestureValidationControllerOnnx: empty label.");
+        Debug.LogWarning("GestureValidationControllerOnnx: button missing label");
         return;
       }
 
       if (handSource == null)
       {
-        Debug.LogWarning("GestureValidationControllerOnnx: handSource missing.");
+        Debug.LogWarning("GestureValidationControllerOnnx: no hand source set");
         return;
       }
 
+      collecting = true;
       activeButton = info;
       activeLabel = info.label.Trim();
-      isCollecting = true;
 
       foreach (var item in buttons)
       {
@@ -174,47 +193,45 @@ namespace HandControl
       if (info.button != null)
       {
         info.button.interactable = true;
-        SetButtonLabel(info, true);
+        UpdateButtonLabel(info, true);
       }
 
-      if (info.status != null)
+      if (info.statusText != null)
       {
-        info.status.text = "Collecting...";
-        info.status.color = Color.yellow;
+        info.statusText.text = "Collecting...";
+        info.statusText.color = Color.yellow;
       }
 
-      frameList.Clear();
-      frameTimes.Clear();
-      progressMsg = "Collecting window...";
-      resultMsg = "Waiting for model...";
+      OnNewSessionStarted?.Invoke();
+
+      frameBuffer.Clear();
+      timeBuffer.Clear();
+      progressText = "Collecting window...";
+      resultText = "Waiting...";
     }
 
-    private void StopCollect(string text, bool resetResult)
+    private void StopCollecting(string message, bool resetResult)
     {
-      if (!isCollecting)
+      if (!collecting)
       {
-        progressMsg = text;
+        progressText = message;
         if (resetResult)
         {
-          resultMsg = "Result: --";
+          resultText = "Result: --";
         }
         return;
       }
 
-      isCollecting = false;
-      progressMsg = text;
+      collecting = false;
+      progressText = message;
 
       if (activeButton != null)
       {
-        if (activeButton.button != null)
+        UpdateButtonLabel(activeButton, false);
+        if (activeButton.statusText != null)
         {
-          SetButtonLabel(activeButton, false);
-        }
-
-        if (activeButton.status != null)
-        {
-          activeButton.status.text = text;
-          activeButton.status.color = text.IndexOf("finish", StringComparison.OrdinalIgnoreCase) >= 0 ? Color.green : Color.white;
+          activeButton.statusText.text = message;
+          activeButton.statusText.color = message.IndexOf("finish", StringComparison.OrdinalIgnoreCase) >= 0 ? Color.green : Color.white;
         }
       }
 
@@ -226,12 +243,12 @@ namespace HandControl
         }
       }
 
-      frameList.Clear();
-      frameTimes.Clear();
+      frameBuffer.Clear();
+      timeBuffer.Clear();
 
       if (resetResult)
       {
-        resultMsg = "Result: --";
+        resultText = "Result: --";
       }
 
       activeButton = null;
@@ -240,150 +257,163 @@ namespace HandControl
 
     private void HandleHandFrame(HandTrackingSource.HandFrameData data)
     {
-      if (!isCollecting)
+      if (!collecting || worker == null)
       {
         return;
       }
 
-      var tracked = data != null && data.tracked && data.landmarks != null && data.landmarks.Length >= 21;
-      if (!tracked && !fillMissing)
+      bool tracked = data != null && data.tracked && data.landmarks != null && data.landmarks.Length >= 21;
+      if (!tracked && !allowEmptyFrames)
       {
         return;
       }
 
-      AddFrame(data, tracked);
-      var count = frameList.Count;
+      SaveFrame(data, tracked);
+
+      int count = frameBuffer.Count;
       if (count == 0)
       {
         return;
       }
 
-      var seconds = CalcSeconds();
-      var needFrames = Mathf.Max(minFrames, Mathf.CeilToInt(windowSeconds * Mathf.Max(1f, fakeFps)));
+      float seconds = GetWindowSeconds();
+      int needFrames = Mathf.Max(minimumFrames, Mathf.CeilToInt(captureSeconds * Mathf.Max(1f, pretendFps)));
 
-      if (count >= needFrames && seconds >= windowSeconds)
+      if (count >= needFrames && seconds >= captureSeconds)
       {
         RunModel();
-        frameList.Clear();
-        frameTimes.Clear();
-        progressMsg = "Window sent to model.";
+        frameBuffer.Clear();
+        timeBuffer.Clear();
+        progressText = "Window sent";
       }
       else
       {
-        progressMsg = $"Collecting {activeLabel}: {seconds:F1}s / {windowSeconds:F1}s";
+        progressText = "Collecting " + activeLabel + ": " + seconds.ToString("F1") + "s / " + captureSeconds.ToString("F1") + "s";
       }
+    }
+
+    private void SaveFrame(HandTrackingSource.HandFrameData data, bool tracked)
+    {
+      float[] row = new float[63];
+      if (tracked && data != null && data.landmarks != null)
+      {
+        for (int i = 0; i < 21 && i < data.landmarks.Length; i++)
+        {
+          var point = data.landmarks[i];
+          int id = i * 3;
+          row[id] = point.x;
+          row[id + 1] = point.y;
+          row[id + 2] = point.z;
+        }
+      }
+
+      frameBuffer.Add(row);
+      timeBuffer.Add(data != null ? data.timestampMillisec : 0);
+    }
+
+    private float GetWindowSeconds()
+    {
+      if (timeBuffer.Count >= 2)
+      {
+        long first = timeBuffer[0];
+        long last = timeBuffer[timeBuffer.Count - 1];
+        if (last > first)
+        {
+          return (last - first) / 1000f;
+        }
+      }
+
+      float frames = frameBuffer.Count;
+      float fps = Mathf.Max(1f, pretendFps);
+      return frames / fps;
     }
 
     private void RunModel()
     {
-      if (worker == null)
+      if (worker == null || frameBuffer.Count == 0)
       {
-        Debug.LogWarning("GestureValidationControllerOnnx: worker not ready.");
         return;
       }
 
-      var features = BuildFeatureList(frameList);
+      List<float[]> features = BuildFeatureList(frameBuffer);
       if (features.Count == 0)
       {
         return;
       }
 
-      var seqLen = Mathf.Min(features.Count, modelMaxLen);
-      var startIndex = Mathf.Max(0, features.Count - modelMaxLen);
+      int usableFrames = Mathf.Min(features.Count, modelMaxLength);
+      int startIndex = Mathf.Max(0, features.Count - modelMaxLength);
 
-      using (var inputTensor = new TensorFloat(new TensorShape(1, modelMaxLen, modelFeatureDim)))
-      using (var maskTensor = new TensorFloat(new TensorShape(1, modelMaxLen)))
+      using (var input = new TensorFloat(new TensorShape(1, modelMaxLength, featureCount)))
+      using (var mask = new TensorFloat(new TensorShape(1, modelMaxLength)))
       {
-        for (var i = 0; i < seqLen; i++)
+        for (int i = 0; i < usableFrames; i++)
         {
-          var feat = features[startIndex + i];
-          for (var j = 0; j < modelFeatureDim; j++)
+          float[] feat = features[startIndex + i];
+          for (int j = 0; j < featureCount; j++)
           {
-            inputTensor[0, i, j] = j < feat.Length ? feat[j] : 0f;
+            float value = j < feat.Length ? feat[j] : 0f;
+            input[0, i, j] = value;
           }
 
-          maskTensor[0, i] = 1f;
+          mask[0, i] = 1f;
         }
 
         try
         {
-          worker.SetInput("input_seq", inputTensor);
-          worker.SetInput("input_mask", maskTensor);
+          worker.SetInput("input_seq", input);
+          worker.SetInput("input_mask", mask);
           worker.Schedule();
 
-          var logitsTensor = worker.PeekOutput("logits");
-          if (logitsTensor == null)
+          float[] logits = ReadTensor(worker.PeekOutput("logits"));
+          if (logits == null || logits.Length == 0)
           {
-            Debug.LogWarning("GestureValidationControllerOnnx: logits output missing.");
+            Debug.LogWarning("GestureValidationControllerOnnx: logits missing");
             return;
           }
 
-          float[] logitsValues;
-          using (var logitsCpu = logitsTensor.ReadbackAndClone() as TensorFloat)
+          float confidence = 0f;
+          float[] confTensor = ReadTensor(worker.PeekOutput("confidence"));
+          if (confTensor != null && confTensor.Length > 0)
           {
-            if (logitsCpu == null || logitsCpu.count == 0)
-            {
-              Debug.LogWarning("GestureValidationControllerOnnx: failed to read logits.");
-              return;
-            }
-
-            logitsValues = new float[logitsCpu.count];
-            for (var idx = 0; idx < logitsValues.Length; idx++)
-            {
-              logitsValues[idx] = logitsCpu[idx];
-            }
+            confidence = confTensor[0];
           }
 
-          var probs = Softmax(logitsValues);
-          var topIndex = 0;
-          var topProb = 0f;
-          for (var i = 0; i < probs.Length; i++)
+          float[] probs = ComputeSoftmax(logits);
+          int bestIndex = 0;
+          float bestProb = 0f;
+          for (int i = 0; i < probs.Length; i++)
           {
-            if (probs[i] > topProb)
+            if (probs[i] > bestProb)
             {
-              topProb = probs[i];
-              topIndex = i;
+              bestProb = probs[i];
+              bestIndex = i;
             }
           }
 
-          var confValue = 0f;
-          var confTensor = worker.PeekOutput("confidence");
-          if (confTensor != null)
+          float targetProb = bestProb;
+          if (!string.IsNullOrEmpty(activeLabel) && labelLookup.TryGetValue(activeLabel, out int wanted) && wanted < probs.Length)
           {
-            using (var confCpu = confTensor.ReadbackAndClone() as TensorFloat)
-            {
-              if (confCpu != null && confCpu.count > 0)
-              {
-                confValue = confCpu[0];
-              }
-            }
+            targetProb = probs[wanted];
           }
 
-          var targetProb = topProb;
-          if (!string.IsNullOrEmpty(activeLabel) && labelLookup.TryGetValue(activeLabel, out var targetIndex) && targetIndex < probs.Length)
-          {
-            targetProb = probs[targetIndex];
-          }
-
-          var targetProbText = targetProb.ToString("F2", CultureInfo.InvariantCulture);
+          string probText = targetProb.ToString("F2", CultureInfo.InvariantCulture);
 
           if (!string.IsNullOrEmpty(activeLabel))
           {
-            resultMsg = "Target " + activeLabel + " prob = " + targetProbText;
-            if (targetProb >= successProb && confValue >= successConf)
+            resultText = "Target " + activeLabel + " prob = " + probText;
+            if (targetProb >= passProbability && confidence >= passConfidence)
             {
-              resultMsg = "Target " + activeLabel + " prob = " + targetProbText + " (passed)";
-              StopCollect("Finished", false);
+              resultText = "Target " + activeLabel + " prob = " + probText + " (passed)";
+              OnGestureMatched?.Invoke(activeLabel);
+              StopCollecting("Finished", false);
             }
           }
           else
           {
-            var topLabel = (topIndex >= 0 && topIndex < labelNames.Count) ? labelNames[topIndex] : "Unknown";
-            resultMsg = "Prediction: " + topLabel + " prob = " + topProb.ToString("F2", CultureInfo.InvariantCulture);
+            string bestName = bestIndex >= 0 && bestIndex < labels.Count ? labels[bestIndex] : "Unknown";
+            resultText = "Prediction: " + bestName + " prob = " + bestProb.ToString("F2", CultureInfo.InvariantCulture);
           }
-
-          logitsTensor.Dispose();
-          confTensor?.Dispose();
         }
         catch (Exception ex)
         {
@@ -392,37 +422,67 @@ namespace HandControl
       }
     }
 
+    private float[] ReadTensor(Tensor tensor)
+    {
+      if (tensor == null)
+      {
+        return null;
+      }
+
+      try
+      {
+        using (var cpu = tensor.ReadbackAndClone() as TensorFloat)
+        {
+          if (cpu == null || cpu.count == 0)
+          {
+            return null;
+          }
+
+          float[] arr = new float[cpu.count];
+          for (int i = 0; i < arr.Length; i++)
+          {
+            arr[i] = cpu[i];
+          }
+          return arr;
+        }
+      }
+      finally
+      {
+        tensor.Dispose();
+      }
+    }
+
     private List<float[]> BuildFeatureList(List<float[]> frames)
     {
-      var list = new List<float[]>(frames.Count);
-      for (var i = 0; i < frames.Count; i++)
+      List<float[]> list = new List<float[]>(frames.Count);
+      for (int i = 0; i < frames.Count; i++)
       {
-        var frame = frames[i];
-        var feat = ExtractFeatures(frame);
-        if (feat != null)
+        float[] features = ExtractFeatures(frames[i]);
+        if (features != null)
         {
-          list.Add(feat);
+          list.Add(features);
         }
       }
 
-      var velocities = new float[list.Count];
-      for (var i = 1; i < list.Count; i++)
+      float[] speed = new float[list.Count];
+      for (int i = 1; i < list.Count; i++)
       {
-        var sum = 0f;
-        for (var j = 0; j < 5 && j < list[i].Length && j < list[i - 1].Length; j++)
+        float diff = 0f;
+        float[] now = list[i];
+        float[] prev = list[i - 1];
+        for (int j = 0; j < 5 && j < now.Length && j < prev.Length; j++)
         {
-          var diff = list[i][j] - list[i - 1][j];
-          sum += diff * diff;
+          float delta = now[j] - prev[j];
+          diff += delta * delta;
         }
-
-        velocities[i] = Mathf.Sqrt(sum);
+        speed[i] = Mathf.Sqrt(diff);
       }
 
-      for (var i = 0; i < list.Count; i++)
+      for (int i = 0; i < list.Count; i++)
       {
         if (list[i].Length > 0)
         {
-          list[i][list[i].Length - 1] = velocities[i];
+          list[i][list[i].Length - 1] = speed[i];
         }
       }
 
@@ -433,35 +493,36 @@ namespace HandControl
     {
       if (frame == null || frame.Length < 63)
       {
-        return new float[modelFeatureDim];
+        return new float[featureCount];
       }
 
-      for (var i = 0; i < 21; i++)
+      for (int i = 0; i < 21; i++)
       {
-        var idx = i * 3;
-        landmarkBuffer[i] = new Vector3(frame[idx], frame[idx + 1], frame[idx + 2]);
+        int idx = i * 3;
+        rawPoints[i] = new Vector3(frame[idx], frame[idx + 1], frame[idx + 2]);
       }
 
-      NormalizeLandmarks();
-      var features = new float[modelFeatureDim];
-      var write = 0;
+      NormaliseHand();
 
-      var palmIndices = new[] { 0, 5, 9, 13, 17 };
-      var palm = Vector2.zero;
-      foreach (var pi in palmIndices)
+      float[] data = new float[featureCount];
+      int cursor = 0;
+
+      int[] palmIds = { 0, 5, 9, 13, 17 };
+      Vector2 palmCenter = Vector2.zero;
+      foreach (int id in palmIds)
       {
-        palm += new Vector2(normBuffer[pi].x, normBuffer[pi].y);
+        palmCenter += new Vector2(normPoints[id].x, normPoints[id].y);
       }
-      palm /= palmIndices.Length;
+      palmCenter /= palmIds.Length;
 
-      var tips = new[] { 4, 8, 12, 16, 20 };
-      foreach (var tip in tips)
+      int[] tipIds = { 4, 8, 12, 16, 20 };
+      foreach (int tip in tipIds)
       {
-        var tipVec = new Vector2(normBuffer[tip].x, normBuffer[tip].y);
-        features[write++] = Vector2.Distance(tipVec, palm);
+        Vector2 tipPos = new Vector2(normPoints[tip].x, normPoints[tip].y);
+        data[cursor++] = Vector2.Distance(tipPos, palmCenter);
       }
 
-      var chains = new[]
+      int[][] chains =
       {
         new [] { 1, 2, 3, 4 },
         new [] { 5, 6, 7, 8 },
@@ -470,144 +531,155 @@ namespace HandControl
         new [] { 17, 18, 19, 20 }
       };
 
-      foreach (var chain in chains)
+      foreach (int[] chain in chains)
       {
-        for (var i = 0; i < chain.Length - 2; i++)
+        for (int i = 0; i < chain.Length - 2; i++)
         {
-          var a = normBuffer[chain[i]] - normBuffer[chain[i + 1]];
-          var b = normBuffer[chain[i + 2]] - normBuffer[chain[i + 1]];
-          var aLen = a.magnitude;
-          var bLen = b.magnitude;
+          Vector3 a = normPoints[chain[i]] - normPoints[chain[i + 1]];
+          Vector3 b = normPoints[chain[i + 2]] - normPoints[chain[i + 1]];
+          float aLen = a.magnitude;
+          float bLen = b.magnitude;
           if (aLen < 1e-6f || bLen < 1e-6f)
           {
-            features[write++] = 0f;
-            continue;
+            data[cursor++] = 0f;
           }
-
-          a /= aLen;
-          b /= bLen;
-          var dot = Mathf.Clamp(Vector3.Dot(a, b), -1f, 1f);
-          features[write++] = Mathf.Acos(dot);
+          else
+          {
+            a /= aLen;
+            b /= bLen;
+            float dot = Mathf.Clamp(Vector3.Dot(a, b), -1f, 1f);
+            data[cursor++] = Mathf.Acos(dot);
+          }
         }
       }
 
-      for (var i = 0; i < tips.Length - 1; i++)
+      for (int i = 0; i < tipIds.Length - 1; i++)
       {
-        features[write++] = Vector3.Distance(normBuffer[tips[i]], normBuffer[tips[i + 1]]);
+        data[cursor++] = Vector3.Distance(normPoints[tipIds[i]], normPoints[tipIds[i + 1]]);
       }
 
-      if (write < modelFeatureDim)
+      if (cursor < featureCount)
       {
-        features[write] = 0f;
+        data[cursor] = 0f;
       }
 
-      return features;
+      return data;
     }
 
-    private void NormalizeLandmarks()
+    private void NormaliseHand()
     {
-      var wrist = landmarkBuffer[0];
-      for (var i = 0; i < landmarkBuffer.Length; i++)
+      Vector3 wrist = rawPoints[0];
+      for (int i = 0; i < rawPoints.Length; i++)
       {
-        var v = landmarkBuffer[i];
-        normBuffer[i] = new Vector3(v.x - wrist.x, v.y - wrist.y, v.z - wrist.z);
+        Vector3 v = rawPoints[i];
+        normPoints[i] = new Vector3(v.x - wrist.x, v.y - wrist.y, v.z - wrist.z);
       }
 
-      var fingerBases = new[] { 5, 9, 13, 17 };
-      var sum = 0f;
-      foreach (var idx in fingerBases)
+      int[] baseIds = { 5, 9, 13, 17 };
+      float sum = 0f;
+      foreach (int id in baseIds)
       {
-        sum += Vector3.Distance(normBuffer[idx], normBuffer[0]);
+        sum += Vector3.Distance(normPoints[id], normPoints[0]);
       }
+      float scale = (baseIds.Length > 0 ? sum / baseIds.Length : 1f) + 1e-6f;
 
-      var handSize = (fingerBases.Length > 0 ? sum / fingerBases.Length : 1f) + 1e-6f;
-      for (var i = 0; i < normBuffer.Length; i++)
+      for (int i = 0; i < normPoints.Length; i++)
       {
-        normBuffer[i] /= handSize;
+        normPoints[i] /= scale;
       }
     }
 
-    private void AddFrame(HandTrackingSource.HandFrameData info, bool tracked)
+    private float[] ComputeSoftmax(IReadOnlyList<float> logits)
     {
-      var slot = new float[63];
-      if (tracked && info != null && info.landmarks != null)
+      float[] output = new float[logits.Count];
+      if (logits.Count == 0)
       {
-        for (var i = 0; i < 21 && i < info.landmarks.Length; i++)
+        return output;
+      }
+
+      float max = logits[0];
+      for (int i = 1; i < logits.Count; i++)
+      {
+        if (logits[i] > max)
         {
-          var lm = info.landmarks[i];
-          var idx = i * 3;
-          slot[idx] = lm.x;
-          slot[idx + 1] = lm.y;
-          slot[idx + 2] = lm.z;
+          max = logits[i];
         }
       }
 
-      frameList.Add(slot);
-      frameTimes.Add(info != null ? info.timestampMillisec : 0);
-    }
-
-    private float CalcSeconds()
-    {
-      if (frameTimes.Count >= 2)
+      float total = 0f;
+      for (int i = 0; i < logits.Count; i++)
       {
-        var first = frameTimes[0];
-        var last = frameTimes[frameTimes.Count - 1];
-        if (last > first)
-        {
-          return (last - first) / 1000f;
-        }
+        float value = Mathf.Exp(logits[i] - max);
+        output[i] = value;
+        total += value;
       }
 
-      return frameList.Count / Mathf.Max(1f, fakeFps);
-    }
-
-    private void UpdateUi()
-    {
-      if (progressText != null)
+      if (total <= 0f)
       {
-        progressText.text = progressMsg;
+        return output;
       }
 
-      if (resultText != null)
+      for (int i = 0; i < output.Length; i++)
       {
-        resultText.text = resultMsg;
+        output[i] /= total;
+      }
+
+      return output;
+    }
+
+    private void UpdateButtonLabel(ButtonInfo info, bool running)
+    {
+      if (info?.button == null)
+      {
+        return;
+      }
+
+      string niceName = string.IsNullOrWhiteSpace(info.label) ? "Gesture" : info.label;
+      Text text = info.button.GetComponentInChildren<Text>();
+      if (text != null)
+      {
+        text.text = running ? "Stop " + niceName : "Test " + niceName;
       }
     }
 
-    private void ReadLabels()
+    private void LoadLabels()
     {
-      labelNames.Clear();
+      labels.Clear();
       labelLookup.Clear();
 
-      if (labelMapJson == null)
+      if (labelMapJson == null || string.IsNullOrEmpty(labelMapJson.text))
       {
         return;
       }
 
       try
       {
-        var raw = labelMapJson.text.Trim();
-        raw = raw.Trim('{', '}', '\n', '\r', '\t');
+        string raw = labelMapJson.text.Trim();
+        if (raw.StartsWith("{") && raw.EndsWith("}"))
+        {
+          raw = raw.Substring(1, raw.Length - 2);
+        }
+
         if (string.IsNullOrEmpty(raw))
         {
           return;
         }
 
-        var entries = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        var sorted = new SortedDictionary<int, string>();
+        string[] parts = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        SortedDictionary<int, string> sorted = new SortedDictionary<int, string>();
 
-        foreach (var entry in entries)
+        foreach (string part in parts)
         {
-          var pair = entry.Split(new[] { ':' }, 2);
+          string[] pair = part.Split(new[] { ':' }, 2);
           if (pair.Length < 2)
           {
             continue;
           }
 
-          var keyText = pair[0].Replace("\"", string.Empty).Trim();
-          var valueText = pair[1].Replace("\"", string.Empty).Trim();
+          string keyText = pair[0].Replace("\"", string.Empty).Trim();
+          string valueText = pair[1].Replace("\"", string.Empty).Trim();
 
-          if (int.TryParse(keyText, out var key))
+          if (int.TryParse(keyText, out int key))
           {
             sorted[key] = valueText;
           }
@@ -615,74 +687,21 @@ namespace HandControl
 
         foreach (var kv in sorted)
         {
-          while (labelNames.Count <= kv.Key)
+          while (labels.Count <= kv.Key)
           {
-            labelNames.Add(string.Empty);
+            labels.Add(string.Empty);
           }
 
-          labelNames[kv.Key] = kv.Value;
+          labels[kv.Key] = kv.Value;
           if (!labelLookup.ContainsKey(kv.Value))
           {
-            labelLookup.Add(kv.Value, kv.Key);
+            labelLookup[kv.Value] = kv.Key;
           }
         }
       }
       catch (Exception ex)
       {
-        Debug.LogWarning("GestureValidationControllerOnnx: failed to read label map - " + ex.Message);
-      }
-    }
-
-    private static float[] Softmax(IReadOnlyList<float> values)
-    {
-      var result = new float[values.Count];
-      if (values.Count == 0)
-      {
-        return result;
-      }
-
-      var max = values[0];
-      for (var i = 1; i < values.Count; i++)
-      {
-        if (values[i] > max)
-        {
-          max = values[i];
-        }
-      }
-
-      float sum = 0f;
-      for (var i = 0; i < values.Count; i++)
-      {
-        var exp = Mathf.Exp(values[i] - max);
-        result[i] = exp;
-        sum += exp;
-      }
-
-      if (sum <= 0f)
-      {
-        return result;
-      }
-
-      for (var i = 0; i < result.Length; i++)
-      {
-        result[i] /= sum;
-      }
-
-      return result;
-    }
-
-    private void SetButtonLabel(ButtonRef info, bool running)
-    {
-      if (info?.button == null)
-      {
-        return;
-      }
-
-      var label = string.IsNullOrWhiteSpace(info.label) ? "Test Gesture" : info.label;
-      var textComp = info.button.GetComponentInChildren<Text>();
-      if (textComp != null)
-      {
-        textComp.text = running ? ("Stop " + label) : ("Test " + label);
+        Debug.LogWarning("GestureValidationControllerOnnx: failed to parse label map - " + ex.Message);
       }
     }
   }
