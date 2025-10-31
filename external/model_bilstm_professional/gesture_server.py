@@ -1,16 +1,10 @@
-﻿#!/usr/bin/env python3
-"""
-Unity ↔ Python bridge server for fixed-window hand gesture inference.
-
-Unity sends 21 hand landmarks per frame and batches them into a window.  This
-server converts the window into model features and returns the BiLSTM prediction.
-"""
+#!/usr/bin/env python3
+# quick and messy server version that mirrors the main one but keeps the tone simple
 
 import json
 import socket
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -20,81 +14,61 @@ SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
-from realtime_enhanced import (
-    normalize_landmarks_enhanced,
-    extract_relative_features_single_frame,
-)
+from realtime_enhanced import normalize_landmarks_enhanced, extract_relative_features_single_frame
 from models.bilstm_trend import build_bilstm_trend_model
 
 HOST = "127.0.0.1"
 PORT = 50007
-DEFAULT_MAX_LEN = 100
+DEFAULT_MAX = 100
 
 
-def load_model(
-    checkpoint_path: Path,
-    label_map_path: Optional[Path] = None,
-) -> Tuple[torch.nn.Module, dict, torch.device, int, int]:
+def load_model():
+    ckpt_path = ROOT / "artifacts" / "checkpoints" / "best.pt"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    data = torch.load(ckpt_path, map_location=device)
 
-    feature_dim = int(checkpoint.get("feature_dim", 20))
-    max_len = int(checkpoint.get("max_len", DEFAULT_MAX_LEN))
+    feature_dim = int(data.get("feature_dim", 20))
+    max_len = int(data.get("max_len", DEFAULT_MAX))
 
-    if label_map_path is None:
-        label_map_path = checkpoint_path.parent.parent / "label_map.json"
-        if not label_map_path.exists():
-            label_map_path = ROOT / "artifacts" / "label_map.json"
+    label_path = ckpt_path.parent.parent / "label_map.json"
+    if not label_path.exists():
+        label_path = ROOT / "artifacts" / "label_map.json"
+    with label_path.open("r", encoding="utf-8") as f:
+        labels_raw = json.load(f)
+    labels = {int(k): v for k, v in labels_raw.items()}
 
-    if not label_map_path.exists():
-        raise FileNotFoundError(f"Label map not found at {label_map_path}")
-
-    with label_map_path.open("r", encoding="utf-8") as f:
-        label_map = json.load(f)
-    label_map = {int(k): v for k, v in label_map.items()}
-
-    num_classes = int(checkpoint.get("num_classes", len(label_map)))
-
-    model = build_bilstm_trend_model(input_dim=feature_dim, num_classes=num_classes)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    num_cls = int(data.get("num_classes", len(labels)))
+    model = build_bilstm_trend_model(input_dim=feature_dim, num_classes=num_cls)
+    model.load_state_dict(data["model_state_dict"])
     model = model.to(device)
     model.eval()
 
-    return model, label_map, device, feature_dim, max_len
+    return model, labels, device, feature_dim, max_len
 
 
-def build_feature_sequence(frames: np.ndarray, feature_dim: int, max_len: int):
-    """Convert a window of landmarks into padded feature sequence and mask."""
-    if frames.size == 0:
-        return None, None
-
-    features = []
-    for frame in frames:
-        normalized = normalize_landmarks_enhanced(frame)
-        if normalized is None:
-            features.append(np.zeros(feature_dim, dtype=np.float32))
+def make_feature_seq(frames, feature_dim, max_len):
+    entries = []
+    for frm in frames:
+        cleaned = normalize_landmarks_enhanced(frm)
+        if cleaned is None:
+            entries.append(np.zeros(feature_dim, dtype=np.float32))
         else:
-            features.append(extract_relative_features_single_frame(normalized))
+            entries.append(extract_relative_features_single_frame(cleaned))
 
-    if not features:
+    if not entries:
         return None, None
 
-    seq = np.asarray(features, dtype=np.float32)
-
-    velocities = np.zeros(len(seq), dtype=np.float32)
+    seq = np.asarray(entries, dtype=np.float32)
+    vel = np.zeros(len(seq), dtype=np.float32)
     if len(seq) > 1:
         palm = seq[:, :5]
-        palm_velocity = np.linalg.norm(np.diff(palm, axis=0), axis=1)
-        velocities[1:] = palm_velocity
-    seq[:, -1] = velocities
+        vel[1:] = np.linalg.norm(np.diff(palm, axis=0), axis=1)
+    seq[:, -1] = vel
 
-    length = len(seq)
-    if length < max_len:
-        pad_len = max_len - length
-        seq = np.vstack([seq, np.zeros((pad_len, seq.shape[1]), dtype=np.float32)])
-        mask = np.concatenate(
-            [np.ones(length, dtype=np.float32), np.zeros(pad_len, dtype=np.float32)]
-        )
+    if len(seq) < max_len:
+        pad = max_len - len(seq)
+        seq = np.vstack([seq, np.zeros((pad, seq.shape[1]), dtype=np.float32)])
+        mask = np.concatenate([np.ones(len(seq) - pad, dtype=np.float32), np.zeros(pad, dtype=np.float32)])
     else:
         seq = seq[-max_len:]
         mask = np.ones(max_len, dtype=np.float32)
@@ -102,130 +76,115 @@ def build_feature_sequence(frames: np.ndarray, feature_dim: int, max_len: int):
     return seq, mask
 
 
-def predict_window(frames, model, device, feature_dim, max_len):
+def predict(frames, model, device, feature_dim, max_len):
     frames = np.asarray(frames, dtype=np.float32)
     if frames.ndim != 3 or frames.shape[1:] != (21, 3):
         return None
 
-    seq, mask = build_feature_sequence(frames, feature_dim, max_len)
+    seq, mask = make_feature_seq(frames, feature_dim, max_len)
     if seq is None:
         return None
 
-    feat_tensor = torch.from_numpy(seq).unsqueeze(0).to(device)
+    seq_tensor = torch.from_numpy(seq).unsqueeze(0).to(device)
     mask_tensor = torch.from_numpy(mask).unsqueeze(0).to(device)
 
     with torch.no_grad():
-        logits, conf, _ = model(feat_tensor, mask_tensor)
+        logits, conf, _ = model(seq_tensor, mask_tensor)
         probs = torch.softmax(logits, dim=1)
 
-    probabilities = probs[0].detach().cpu().numpy()
-    top_index = int(np.argmax(probabilities))
-    top_prob = float(probabilities[top_index])
+    arr = probs[0].cpu().numpy()
+    idx = int(np.argmax(arr))
+    top_prob = float(arr[idx])
     confidence = float(conf.detach().view(-1).cpu().item())
+    return idx, top_prob, confidence, arr
 
-    return top_index, top_prob, confidence, probabilities
 
-
-def handle_client(conn: socket.socket, model, label_map, device, feature_dim, max_len) -> None:
-    file = conn.makefile("rwb")
+def handle_client(conn, model, labels, device, feature_dim, max_len):
+    stream = conn.makefile("rwb")
     print("Client connected.")
-
     try:
         while True:
-            chunk = file.readline()
-            if not chunk:
-                print("Client disconnected.")
+            raw = stream.readline()
+            if not raw:
+                print("Client left.")
                 break
 
-            line = chunk.decode("utf-8").strip()
+            line = raw.decode("utf-8").strip()
             if not line:
                 continue
 
             try:
-                payload = json.loads(line)
+                data = json.loads(line)
             except json.JSONDecodeError:
-                print(f"Invalid JSON received: {line}")
+                print("Bad JSON:", line)
                 continue
 
-            if payload.get("command") == "stop":
+            if data.get("command") == "stop":
                 continue
 
-            sequence = payload.get("sequence")
-            if not sequence:
+            seq = data.get("sequence")
+            if not seq:
                 continue
 
-            target_label = payload.get("target_label")
+            target_name = data.get("target_label", "")
 
-            frame_count = int(payload.get("frame_count", len(sequence)))
-            duration_seconds = float(payload.get("duration", 0.0))
-
-            prediction = predict_window(
-                sequence, model, device, feature_dim, max_len
-            )
-            if prediction is None:
+            guess = predict(seq, model, device, feature_dim, max_len)
+            if guess is None:
                 continue
 
-            top_index, top_prob, confidence, probabilities = prediction
-
-            top1_label = label_map.get(top_index, str(top_index))
+            top_id, top_prob, conf, prob_list = guess
+            top_name = labels.get(top_id, str(top_id))
 
             target_prob = top_prob
-            matched_target = False
-
-            if isinstance(target_label, str) and target_label:
-                target_prob = 0.0
-                for cls_id, name in label_map.items():
-                    if isinstance(name, str) and name.lower() == target_label.lower():
-                        target_prob = float(probabilities[int(cls_id)])
-                        matched_target = cls_id == top_index
+            matched = False
+            if isinstance(target_name, str) and target_name:
+                for key, val in labels.items():
+                    if isinstance(val, str) and val.lower() == target_name.lower():
+                        target_prob = float(prob_list[int(key)])
+                        matched = int(key) == top_id
                         break
 
-            response = {
-                "top1": top1_label,
+            reply = {
+                "top1": top_name,
                 "top1_prob": top_prob,
-                "target_label": target_label or "",
+                "target_label": target_name,
                 "prob": target_prob,
-                "confidence": confidence,
-                "match": bool(matched_target),
+                "confidence": conf,
+                "match": bool(matched),
             }
 
-            file.write((json.dumps(response) + "\n").encode("utf-8"))
-            file.flush()
+            stream.write((json.dumps(reply) + "\n").encode("utf-8"))
+            stream.flush()
 
-            print(
-                f"Window processed: frames={frame_count}, duration={duration_seconds:.2f}s, "
-                f"top1={top1_label}, top1_prob={top_prob:.2f}, target_prob={target_prob:.2f}, conf={confidence:.2f}"
-            )
+            print("Window processed:", top_name, top_prob, conf)
     finally:
-        file.close()
+        stream.close()
         conn.close()
-        print("Closed connection.")
+        print("Connection closed.")
 
 
-def main() -> None:
-    checkpoint = ROOT / "artifacts" / "checkpoints" / "best.pt"
-    model, label_map, device, feature_dim, max_len = load_model(checkpoint)
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind((HOST, PORT))
-        server.listen(1)
-        print(f"Gesture server listening on {HOST}:{PORT}")
+def main():
+    model, labels, device, feature_dim, max_len = load_model()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind((HOST, PORT))
+        srv.listen(1)
+        print("Basic server listening on", HOST, PORT)
 
         try:
             while True:
                 try:
-                    conn, _ = server.accept()
+                    conn, _ = srv.accept()
                 except KeyboardInterrupt:
-                    print("Keyboard interrupt received. Shutting down server.")
+                    print("Stopping server.")
                     break
 
                 try:
-                    handle_client(conn, model, label_map, device, feature_dim, max_len)
+                    handle_client(conn, model, labels, device, feature_dim, max_len)
                 except Exception as exc:
-                    print(f"Error while handling client: {exc}")
+                    print("Error while handling client:", exc)
         except KeyboardInterrupt:
-            print("Keyboard interrupt received. Shutting down server.")
+            print("Server stopped.")
 
 
 if __name__ == "__main__":

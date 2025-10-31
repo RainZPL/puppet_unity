@@ -2,21 +2,16 @@ using UnityEngine;
 
 namespace HandControl
 {
-  /// <summary>
-  /// Minimal finger-to-bone rotation driver:
-  ///   - Thumb raises the right upper arm, thumb curl bends the right forearm.
-  ///   - Ring finger raises the left upper arm, ring curl bends the left forearm.
-  /// No IK targets are needed; we only rotate the specified bones.
-  /// </summary>
+  // Finger rotation driver (newbie version).
   [DefaultExecutionOrder(-5)]
   public class FingerRotationDriver : MonoBehaviour
   {
-    [SerializeField] private HandTrackingSource source;
+    [SerializeField] private HandTrackingSource handSource;
     [SerializeField] private bool useRightHand = true;
 
     [Header("Right Arm (thumb)")]
-    [SerializeField] private Transform rightUpperArm;
-    [SerializeField] private Transform rightForearm;
+    [SerializeField] private Transform rightUpper;
+    [SerializeField] private Transform rightFore;
     [SerializeField] private Vector3 rightUpperAxis = new Vector3(1f, 0f, 0f);
     [SerializeField] private float rightUpperMaxAngle = 90f;
     [SerializeField] private Vector3 rightForeAxis = new Vector3(1f, 0f, 0f);
@@ -27,8 +22,8 @@ namespace HandControl
     [SerializeField] private float rightCurlGain = 1.2f;
 
     [Header("Left Arm (ring finger)")]
-    [SerializeField] private Transform leftUpperArm;
-    [SerializeField] private Transform leftForearm;
+    [SerializeField] private Transform leftUpper;
+    [SerializeField] private Transform leftFore;
     [SerializeField] private Vector3 leftUpperAxis = new Vector3(1f, 0f, 0f);
     [SerializeField] private float leftUpperMaxAngle = 90f;
     [SerializeField] private Vector3 leftForeAxis = new Vector3(1f, 0f, 0f);
@@ -45,9 +40,9 @@ namespace HandControl
     [SerializeField] private float headYawRange = 45f;
     [SerializeField] private float headPitchRange = 30f;
     [SerializeField] private float headCurlAngle = 20f;
-    [SerializeField] private float headMotionGain = 1.0f;
+    [SerializeField] private float headGain = 1.0f;
 
-    [Header("Body Yaw (palm rotation)")]
+    [Header("Body (palm twist)")]
     [SerializeField] private Transform bodyRoot;
     [SerializeField] private Vector3 bodyYawAxis = new Vector3(0f, 1f, 0f);
     [SerializeField] private float bodyYawRange = 70f;
@@ -58,68 +53,68 @@ namespace HandControl
     [Header("Smoothing")]
     [SerializeField] private float smoothing = 12f;
 
-    private Quaternion _rightUpperBase;
-    private Quaternion _rightForeBase;
-    private Quaternion _leftUpperBase;
-    private Quaternion _leftForeBase;
-    private Quaternion _headBase;
-    private Quaternion _bodyBase;
+    private Quaternion rightUpperRest;
+    private Quaternion rightForeRest;
+    private Quaternion leftUpperRest;
+    private Quaternion leftForeRest;
+    private Quaternion headRest;
+    private Quaternion bodyRest;
 
-    private bool _restCaptured;
-    private Vector3 _thumbRestVector;
-    private float _thumbCurlRest;
-    private Vector3 _ringRestVector;
-    private float _ringCurlRest;
+    private bool restReady;
+    private Vector3 thumbRestVec;
+    private float thumbCurlRest;
+    private Vector3 ringRestVec;
+    private float ringCurlRest;
 
-    private float _rightRaise;
-    private float _rightCurl;
-    private float _leftRaise;
-    private float _leftCurl;
-    private float _headYaw;
-    private float _headPitch;
-    private float _headCurl;
-    private float _bodyYaw;
-    private Vector3 _indexRestDelta;
-    private float _indexCurlRest;
-    private Vector3 _palmNormalRest;
-    private Vector3 _palmNormalRestNormalized;
+    private float rightRaiseValue;
+    private float rightCurlValue;
+    private float leftRaiseValue;
+    private float leftCurlValue;
+    private float headYawValue;
+    private float headPitchValue;
+    private float headCurlValue;
+    private float bodyYawValue;
+    private Vector3 indexRestVec;
+    private float indexCurlRest;
+    private Vector3 palmRestVec;
+    private Vector3 palmRestVecNormalized;
 
     private void OnEnable()
     {
-      CaptureAnimatorPose();
+      RememberBonePose();
 
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame += HandleHandFrame;
+        handSource.OnHandFrame += HandleHandFrame;
       }
     }
 
     private void OnDisable()
     {
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame -= HandleHandFrame;
+        handSource.OnHandFrame -= HandleHandFrame;
       }
 
-      _restCaptured = false;
-      _rightRaise = _rightCurl = 0f;
-      _leftRaise = _leftCurl = 0f;
-      _headYaw = _headPitch = _headCurl = 0f;
-      _bodyYaw = 0f;
-      RestoreAnimatorPose();
+      restReady = false;
+      rightRaiseValue = rightCurlValue = 0f;
+      leftRaiseValue = leftCurlValue = 0f;
+      headYawValue = headPitchValue = headCurlValue = 0f;
+      bodyYawValue = 0f;
+      RestoreBonePose();
     }
 
     private void HandleHandFrame(HandTrackingSource.HandFrameData frame)
     {
       if (frame == null || frame.landmarks == null || frame.landmarks.Length < 21 || !frame.tracked)
       {
-        ResetTargets();
+        EaseBackToPose();
         return;
       }
 
       if (useRightHand && !frame.isRight || !useRightHand && frame.isRight)
       {
-        ResetTargets();
+        EaseBackToPose();
         return;
       }
 
@@ -140,38 +135,38 @@ namespace HandControl
       var ringCurlCurrent = ComputeFingerCurl(13, 14, 15, 16, pts);
       var indexCurlCurrent = ComputeFingerCurl(5, 6, 7, 8, pts);
 
-      if (!_restCaptured)
+      if (!restReady)
       {
-        _thumbRestVector = thumbVector;
-        _ringRestVector = ringVector;
-        _thumbCurlRest = thumbCurlCurrent;
-        _ringCurlRest = ringCurlCurrent;
-        _indexRestDelta = indexDelta;
-        _indexCurlRest = indexCurlCurrent;
-        _palmNormalRest = palmNormal;
-        _palmNormalRestNormalized = palmNormal.normalized;
-        _restCaptured = true;
+        thumbRestVec = thumbVector;
+        ringRestVec = ringVector;
+        thumbCurlRest = thumbCurlCurrent;
+        ringCurlRest = ringCurlCurrent;
+        indexRestVec = indexDelta;
+        indexCurlRest = indexCurlCurrent;
+        palmRestVec = palmNormal;
+        palmRestVecNormalized = palmNormal.normalized;
+        restReady = true;
       }
 
-      var thumbRaiseDelta = Vector3.Dot(thumbVector - _thumbRestVector, Vector3.up);
-      var ringRaiseDelta = Vector3.Dot(ringVector - _ringRestVector, Vector3.up);
+      var thumbRaiseDelta = Vector3.Dot(thumbVector - thumbRestVec, Vector3.up);
+      var ringRaiseDelta = Vector3.Dot(ringVector - ringRestVec, Vector3.up);
 
       var targetRightRaise = Mathf.Clamp(thumbRaiseDelta * rightRaiseGain, -1f, 1f);
       var targetLeftRaise = Mathf.Clamp(ringRaiseDelta * leftRaiseGain, -1f, 1f);
 
-      var thumbCurlDelta = Mathf.Max(0f, _thumbCurlRest - thumbCurlCurrent);
-      var ringCurlDelta = Mathf.Max(0f, _ringCurlRest - ringCurlCurrent);
+      var thumbCurlDelta = Mathf.Max(0f, thumbCurlRest - thumbCurlCurrent);
+      var ringCurlDelta = Mathf.Max(0f, ringCurlRest - ringCurlCurrent);
 
       var targetRightCurl = Mathf.Clamp01(thumbCurlDelta * rightCurlGain);
       var targetLeftCurl = Mathf.Clamp01(ringCurlDelta * leftCurlGain);
 
-      var indexOffset = indexDelta - _indexRestDelta;
-      var targetHeadYaw = Mathf.Clamp(indexOffset.x * headMotionGain, -1f, 1f) * headYawRange;
-      var targetHeadPitch = Mathf.Clamp(-indexOffset.y * headMotionGain, -1f, 1f) * headPitchRange;
-      var indexCurlDelta = Mathf.Max(0f, _indexCurlRest - indexCurlCurrent) * headCurlAngle;
+      var indexOffset = indexDelta - indexRestVec;
+      var targetHeadYaw = Mathf.Clamp(indexOffset.x * headGain, -1f, 1f) * headYawRange;
+      var targetHeadPitch = Mathf.Clamp(-indexOffset.y * headGain, -1f, 1f) * headPitchRange;
+      var indexCurlDelta = Mathf.Max(0f, indexCurlRest - indexCurlCurrent) * headCurlAngle;
 
       float targetBodyYaw = 0f;
-      var restNorm = _palmNormalRestNormalized;
+      var restNorm = palmRestVecNormalized;
       var currNorm = palmNormal.normalized;
       if (restNorm.sqrMagnitude > 1e-6f && currNorm.sqrMagnitude > 1e-6f)
       {
@@ -198,30 +193,30 @@ namespace HandControl
       }
 
       var lerp = Mathf.Clamp01(Time.deltaTime * Mathf.Max(1f, smoothing));
-      _rightRaise = Mathf.Lerp(_rightRaise, targetRightRaise, lerp);
-      _rightCurl = Mathf.Lerp(_rightCurl, targetRightCurl, lerp);
-      _leftRaise = Mathf.Lerp(_leftRaise, targetLeftRaise, lerp);
-      _leftCurl = Mathf.Lerp(_leftCurl, targetLeftCurl, lerp);
-      _headYaw = Mathf.Lerp(_headYaw, targetHeadYaw, lerp);
-      _headPitch = Mathf.Lerp(_headPitch, targetHeadPitch, lerp);
-      _headCurl = Mathf.Lerp(_headCurl, indexCurlDelta, lerp);
-      _bodyYaw = Mathf.Lerp(_bodyYaw, targetBodyYaw, lerp);
+      rightRaiseValue = Mathf.Lerp(rightRaiseValue, targetRightRaise, lerp);
+      rightCurlValue = Mathf.Lerp(rightCurlValue, targetRightCurl, lerp);
+      leftRaiseValue = Mathf.Lerp(leftRaiseValue, targetLeftRaise, lerp);
+      leftCurlValue = Mathf.Lerp(leftCurlValue, targetLeftCurl, lerp);
+      headYawValue = Mathf.Lerp(headYawValue, targetHeadYaw, lerp);
+      headPitchValue = Mathf.Lerp(headPitchValue, targetHeadPitch, lerp);
+      headCurlValue = Mathf.Lerp(headCurlValue, indexCurlDelta, lerp);
+      bodyYawValue = Mathf.Lerp(bodyYawValue, targetBodyYaw, lerp);
 
     }
 
-    private void ResetTargets()
+    private void EaseBackToPose()
     {
       var lerp = Mathf.Clamp01(Time.deltaTime * Mathf.Max(1f, smoothing));
-      _rightRaise = Mathf.Lerp(_rightRaise, 0f, lerp);
-      _rightCurl = Mathf.Lerp(_rightCurl, 0f, lerp);
-      _leftRaise = Mathf.Lerp(_leftRaise, 0f, lerp);
-      _leftCurl = Mathf.Lerp(_leftCurl, 0f, lerp);
-      _headYaw = Mathf.Lerp(_headYaw, 0f, lerp);
-      _headPitch = Mathf.Lerp(_headPitch, 0f, lerp);
-      _headCurl = Mathf.Lerp(_headCurl, 0f, lerp);
-      _bodyYaw = Mathf.Lerp(_bodyYaw, 0f, lerp);
-      _restCaptured = false;
-      _palmNormalRestNormalized = Vector3.zero;
+      rightRaiseValue = Mathf.Lerp(rightRaiseValue, 0f, lerp);
+      rightCurlValue = Mathf.Lerp(rightCurlValue, 0f, lerp);
+      leftRaiseValue = Mathf.Lerp(leftRaiseValue, 0f, lerp);
+      leftCurlValue = Mathf.Lerp(leftCurlValue, 0f, lerp);
+      headYawValue = Mathf.Lerp(headYawValue, 0f, lerp);
+      headPitchValue = Mathf.Lerp(headPitchValue, 0f, lerp);
+      headCurlValue = Mathf.Lerp(headCurlValue, 0f, lerp);
+      bodyYawValue = Mathf.Lerp(bodyYawValue, 0f, lerp);
+      restReady = false;
+      palmRestVecNormalized = Vector3.zero;
     }
 
     private void LateUpdate()
@@ -231,78 +226,78 @@ namespace HandControl
 
     private void ApplyRotations()
     {
-      if (rightUpperArm)
+      if (rightUpper)
       {
-        _rightUpperBase = rightUpperArm.localRotation;
+        rightUpperRest = rightUpper.localRotation;
         var axis = rightUpperAxis.sqrMagnitude > 0f ? rightUpperAxis.normalized : Vector3.right;
-        var angle = Mathf.Lerp(rightUpperMinAngle, rightUpperMaxAngle, Mathf.InverseLerp(-1f, 1f, _rightRaise));
-        rightUpperArm.localRotation = _rightUpperBase * Quaternion.AngleAxis(angle, axis);
+        var angle = Mathf.Lerp(rightUpperMinAngle, rightUpperMaxAngle, Mathf.InverseLerp(-1f, 1f, rightRaiseValue));
+        rightUpper.localRotation = rightUpperRest * Quaternion.AngleAxis(angle, axis);
       }
 
-      if (rightForearm)
+      if (rightFore)
       {
-        _rightForeBase = rightForearm.localRotation;
+        rightForeRest = rightFore.localRotation;
         var axis = rightForeAxis.sqrMagnitude > 0f ? rightForeAxis.normalized : Vector3.right;
-        var angle = Mathf.Lerp(rightForeMinAngle, rightForeMaxAngle, Mathf.Clamp01(_rightCurl));
-        rightForearm.localRotation = _rightForeBase * Quaternion.AngleAxis(angle, axis);
+        var angle = Mathf.Lerp(rightForeMinAngle, rightForeMaxAngle, Mathf.Clamp01(rightCurlValue));
+        rightFore.localRotation = rightForeRest * Quaternion.AngleAxis(angle, axis);
       }
 
-      if (leftUpperArm)
+      if (leftUpper)
       {
-        _leftUpperBase = leftUpperArm.localRotation;
+        leftUpperRest = leftUpper.localRotation;
         var axis = leftUpperAxis.sqrMagnitude > 0f ? leftUpperAxis.normalized : Vector3.right;
-        var angle = Mathf.Lerp(leftUpperMinAngle, leftUpperMaxAngle, Mathf.InverseLerp(-1f, 1f, _leftRaise));
-        leftUpperArm.localRotation = _leftUpperBase * Quaternion.AngleAxis(angle, axis);
+        var angle = Mathf.Lerp(leftUpperMinAngle, leftUpperMaxAngle, Mathf.InverseLerp(-1f, 1f, leftRaiseValue));
+        leftUpper.localRotation = leftUpperRest * Quaternion.AngleAxis(angle, axis);
       }
 
-      if (leftForearm)
+      if (leftFore)
       {
-        _leftForeBase = leftForearm.localRotation;
+        leftForeRest = leftFore.localRotation;
         var axis = leftForeAxis.sqrMagnitude > 0f ? leftForeAxis.normalized : Vector3.right;
-        var angle = Mathf.Lerp(leftForeMinAngle, leftForeMaxAngle, Mathf.Clamp01(_leftCurl));
-        leftForearm.localRotation = _leftForeBase * Quaternion.AngleAxis(angle, axis);
+        var angle = Mathf.Lerp(leftForeMinAngle, leftForeMaxAngle, Mathf.Clamp01(leftCurlValue));
+        leftFore.localRotation = leftForeRest * Quaternion.AngleAxis(angle, axis);
       }
 
       if (headBone)
       {
-        _headBase = headBone.localRotation;
+        headRest = headBone.localRotation;
         var yawAxis = headYawAxis.sqrMagnitude > 0f ? headYawAxis.normalized : Vector3.up;
         var pitchAxis = headPitchAxis.sqrMagnitude > 0f ? headPitchAxis.normalized : Vector3.right;
-        var yawRot = Quaternion.AngleAxis(_headYaw, yawAxis);
-        var pitchRot = Quaternion.AngleAxis(_headPitch + _headCurl, pitchAxis);
-        headBone.localRotation = _headBase * yawRot * pitchRot;
+        var yawRot = Quaternion.AngleAxis(headYawValue, yawAxis);
+        var pitchRot = Quaternion.AngleAxis(headPitchValue + headCurlValue, pitchAxis);
+        headBone.localRotation = headRest * yawRot * pitchRot;
       }
 
       if (bodyRoot)
       {
-        _bodyBase = bodyRoot.localRotation;
+        bodyRest = bodyRoot.localRotation;
         var axis = bodyYawAxis.sqrMagnitude > 0f ? bodyYawAxis.normalized : Vector3.up;
         if (bodyAxisInWorldSpace)
         {
           axis = bodyRoot.InverseTransformDirection(axis).normalized;
         }
-        bodyRoot.localRotation = _bodyBase * Quaternion.AngleAxis(_bodyYaw, axis);
+        bodyRoot.localRotation = bodyRest * Quaternion.AngleAxis(bodyYawValue, axis);
       }
     }
 
-    private void RestoreAnimatorPose()
+    private void RestoreBonePose()
     {
-      if (rightUpperArm) rightUpperArm.localRotation = _rightUpperBase;
-      if (rightForearm) rightForearm.localRotation = _rightForeBase;
-      if (leftUpperArm) leftUpperArm.localRotation = _leftUpperBase;
-      if (leftForearm) leftForearm.localRotation = _leftForeBase;
-      if (headBone) headBone.localRotation = _headBase;
-      if (bodyRoot) bodyRoot.localRotation = _bodyBase;
+      if (rightUpper) rightUpper.localRotation = rightUpperRest;
+      if (rightFore) rightFore.localRotation = rightForeRest;
+      if (leftUpper) leftUpper.localRotation = leftUpperRest;
+      if (leftFore) leftFore.localRotation = leftForeRest;
+      if (headBone) headBone.localRotation = headRest;
+      if (bodyRoot) bodyRoot.localRotation = bodyRest;
     }
 
-    private void CaptureAnimatorPose()
+    private void RememberBonePose()
     {
-      if (rightUpperArm) _rightUpperBase = rightUpperArm.localRotation;
-      if (rightForearm) _rightForeBase = rightForearm.localRotation;
-      if (leftUpperArm) _leftUpperBase = leftUpperArm.localRotation;
-      if (leftForearm) _leftForeBase = leftForearm.localRotation;
-      if (headBone) _headBase = headBone.localRotation;
-      if (bodyRoot) _bodyBase = bodyRoot.localRotation;
+      if (rightUpper) rightUpperRest = rightUpper.localRotation;
+      if (rightFore) rightForeRest = rightFore.localRotation;
+      if (leftUpper) leftUpperRest = leftUpper.localRotation;
+      if (leftFore) leftForeRest = leftFore.localRotation;
+      if (headBone) headRest = headBone.localRotation;
+      if (bodyRoot) bodyRest = bodyRoot.localRotation;
     }
 
     private static float ComputeFingerCurl(int mcp, int pip, int dip, int tip, Vector3[] pts)
