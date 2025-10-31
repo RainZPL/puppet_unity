@@ -31,6 +31,7 @@ class BiLSTMTrendModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.num_classes = num_classes
+        self.use_packed_sequence = True  # can be disabled (e.g. for ONNX export)
 
         # Input projection
         self.input_proj = nn.Sequential(
@@ -94,6 +95,11 @@ class BiLSTMTrendModel(nn.Module):
 
         # Bidirectional LSTM
         if mask is not None:
+            mask = mask.to(x.dtype)
+
+        use_pack = self.use_packed_sequence and mask is not None
+
+        if use_pack:
             # Pack sequence for efficiency
             lengths = mask.sum(dim=1).cpu().long()
             packed = nn.utils.rnn.pack_padded_sequence(
@@ -108,6 +114,8 @@ class BiLSTMTrendModel(nn.Module):
                 padding = torch.zeros(N, pad_len, self.hidden_dim, device=x.device)
                 lstm_out = torch.cat([lstm_out, padding], dim=1)
         else:
+            if mask is not None:
+                x = x * mask.unsqueeze(-1)
             lstm_out, (h_n, c_n) = self.bilstm(x)
 
         # lstm_out: [N, T, hidden_dim]

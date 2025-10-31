@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,79 +11,49 @@ using UnityEngine.UI;
 
 namespace HandControl
 {
-  /// <summary>
-  /// Provides button-driven gesture validation. Each button corresponds to a target gesture.
-  /// When a button is pressed the script streams hand landmarks to the Python inference server
-  /// until the target gesture reaches the configured probability/ confidence threshold.
-  /// </summary>
-  [DefaultExecutionOrder(-4)]
+  // quick-and-dirty version, pretty loose structure on purpose
   public class GestureValidationController : MonoBehaviour
   {
     [Serializable]
-    private class GestureButtonConfig
+    public class ButtonInfo
     {
-      [Tooltip("Label returned by the Python model for this gesture.")]
-      public string gestureLabel;
-
-      [Tooltip("UI button that triggers the validation for the gesture.")]
-      public Button triggerButton;
-
-      [Tooltip("Optional status text shown near the button.")]
-      public Text statusLabel;
+      public string myLabel;
+      public Button myButton;
+      public Text myStatus;
     }
 
-    [Header("References")]
-    [SerializeField] private HandTrackingSource source;
-    [SerializeField] private Text progressText;
-    [SerializeField] private Text resultText;
-    [SerializeField] private List<GestureButtonConfig> gestureButtons = new();
+    public HandTrackingSource handSource;
+    public Text progressText;
+    public Text resultText;
+    public List<ButtonInfo> buttons = new List<ButtonInfo>();
 
-    [Header("Network")]
-    [SerializeField] private string host = "127.0.0.1";
-    [SerializeField] private int port = 50007;
+    public string serverHost = "127.0.0.1";
+    public int serverPort = 50007;
+    public float windowSeconds = 5f;
+    public int minFrames = 60;
+    public float fakeFps = 30f;
+    public bool fillMissing = true;
+    public float needProb = 0.75f;
+    public float needConf = 0.5f;
 
-    [Header("Window Settings")]
-    [SerializeField, Tooltip("Seconds of data to collect before sending to Python.")]
-    private float windowSeconds = 5f;
-
-    [SerializeField, Tooltip("Minimum frames required before sending a window.")]
-    private int minimumFrames = 60;
-
-    [SerializeField, Tooltip("Expected capture FPS used to estimate window duration.")]
-    private float targetFps = 30f;
-
-    [SerializeField, Tooltip("When tracking is lost, append a zero frame to keep timing consistent.")]
-    private bool padMissingFrames = true;
-
-    [Header("Success Criteria")]
-    [SerializeField, Tooltip("Minimum top-1 probability required to validate the gesture.")]
-    private float successProbabilityThreshold = 0.75f;
-
-    [SerializeField, Tooltip("Minimum model confidence required to validate the gesture.")]
-    private float successConfidenceThreshold = 0.5f;
-
-    private readonly ConcurrentQueue<string> _sendQueue = new();
-    private readonly ConcurrentQueue<(string message, bool resetResult)> _stopRequests = new();
-    private readonly List<float[]> _windowFrames = new();
-    private readonly List<long> _windowTimestamps = new();
-
-    private CancellationTokenSource _cts;
-    private TcpClient _client;
-    private StreamWriter _writer;
-    private StreamReader _reader;
-    private Task _senderTask;
-    private Task _receiverTask;
-    private bool _isRunning;
-    private bool _isConnected;
-    private string _progressStatus = "Select a gesture to begin.";
-    private string _resultStatus = "Result: --";
-    private readonly object _connectionLock = new();
-
-    private GestureButtonConfig _activeButton;
-    private string _targetGesture;
+    private readonly List<float[]> frameList = new List<float[]>();
+    private readonly List<long> frameTimes = new List<long>();
+    private TcpClient sock;
+    private StreamReader sockReader;
+    private StreamWriter sockWriter;
+    private CancellationTokenSource listenStop;
+    private Task listenJob;
+    private string activeLabel;
+    private ButtonInfo activeButton;
+    private string progressMsg = "Not started.";
+    private string resultMsg = "Result: --";
+    private bool isCollecting;
+    private readonly Queue<string> stopMsgQueue = new Queue<string>();
+    private readonly Queue<bool> stopResetQueue = new Queue<bool>();
+    private readonly object stopLock = new object();
 
     [Serializable]
-    private class GestureResult
+    private class ModelAnswer
     {
       public string top1;
       public float top1_prob;
@@ -96,287 +65,302 @@ namespace HandControl
 
     private void Awake()
     {
-      foreach (var config in gestureButtons)
+      foreach (var info in buttons)
       {
-        if (config == null || config.triggerButton == null)
+        if (info == null || info.myButton == null)
         {
           continue;
         }
 
-        var capturedConfig = config;
-        config.triggerButton.onClick.AddListener(() => HandleGestureButton(capturedConfig));
+        var localInfo = info;
+        info.myButton.onClick.AddListener(() => OnButtonHit(localInfo));
+        UpdateButtonLabel(info, false);
 
-        var label = string.IsNullOrWhiteSpace(config.gestureLabel)
-          ? "Test Gesture"
-          : $"Test {config.gestureLabel}";
-        config.triggerButton.SetLabel(label);
-
-        if (config.statusLabel != null)
+        if (info.myStatus != null)
         {
-          config.statusLabel.text = "Not tested";
-          config.statusLabel.color = Color.white;
+          info.myStatus.text = "Not started";
+          info.myStatus.color = Color.white;
         }
       }
 
-      ConfigureText(progressText);
-      ConfigureText(resultText);
-      UpdateUiText();
-    }
-
-    private static void ConfigureText(Text target)
-    {
-      if (target == null)
-      {
-        return;
-      }
-
-      target.horizontalOverflow = HorizontalWrapMode.Overflow;
-      target.verticalOverflow = VerticalWrapMode.Overflow;
-      target.resizeTextForBestFit = false;
-      target.alignment = TextAnchor.UpperLeft;
+      UpdateUi();
     }
 
     private void OnEnable()
     {
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame += HandleHandFrame;
+        handSource.OnHandFrame += HandleHandFrame;
       }
     }
 
     private void OnDisable()
     {
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame -= HandleHandFrame;
+        handSource.OnHandFrame -= HandleHandFrame;
       }
 
-      StopGestureInternal("Validation stopped.", true);
+      StopCollect("Stopped", true);
     }
 
     private void Update()
     {
-      UpdateUiText();
+      CheckPendingStop();
+      UpdateUi();
+    }
 
-      if (_stopRequests.TryDequeue(out var request))
+    private void OnButtonHit(ButtonInfo info)
+    {
+      if (info == null)
       {
-        StopGestureInternal(request.message, true, request.resetResult);
+        return;
+      }
+
+      if (isCollecting && activeButton == info)
+      {
+        StopCollect("Stopped by user", true);
+        return;
+      }
+
+      StopCollect("Setting up...", false);
+      StartCollect(info);
+    }
+
+    private void StartCollect(ButtonInfo info)
+    {
+      if (string.IsNullOrWhiteSpace(info.myLabel))
+      {
+        Debug.LogWarning("Target label is empty.");
+        return;
+      }
+
+      if (handSource == null)
+      {
+        Debug.LogWarning("HandTrackingSource is missing.");
+        return;
+      }
+
+      activeButton = info;
+      activeLabel = info.myLabel.Trim();
+      isCollecting = true;
+
+      foreach (var item in buttons)
+      {
+        if (item?.myButton != null)
+        {
+          item.myButton.interactable = false;
+        }
+      }
+
+      if (info.myButton != null)
+      {
+        info.myButton.interactable = true;
+        UpdateButtonLabel(info, true);
+      }
+
+      if (info.myStatus != null)
+      {
+        info.myStatus.text = "Collecting...";
+        info.myStatus.color = Color.yellow;
+      }
+
+      frameList.Clear();
+      frameTimes.Clear();
+      lock (stopLock)
+      {
+        stopMsgQueue.Clear();
+        stopResetQueue.Clear();
+      }
+      progressMsg = "Collecting window...";
+      resultMsg = "Waiting for server...";
+
+      if (!ConnectServer())
+      {
+        StopCollect("Connect failed", true);
+        return;
+      }
+
+      StartListenLoop();
+    }
+
+    private bool ConnectServer()
+    {
+      try
+      {
+        sock = new TcpClient();
+        sock.Connect(serverHost, serverPort);
+        var net = sock.GetStream();
+        sockWriter = new StreamWriter(net, new UTF8Encoding(false)) { AutoFlush = true };
+        sockReader = new StreamReader(net, Encoding.UTF8);
+        return true;
+      }
+      catch (Exception e)
+      {
+        Debug.LogError("Failed to reach Python: " + e.Message);
+        return false;
       }
     }
 
-    private void HandleGestureButton(GestureButtonConfig config)
+    private void StartListenLoop()
     {
-      if (config == null)
-      {
-        return;
-      }
-
-      if (_isRunning && _activeButton == config)
-      {
-        StopGestureInternal("Validation cancelled.", true);
-        return;
-      }
-
-      StopGestureInternal("Preparing new validation...", false);
-      StartGestureValidation(config);
+      listenStop = new CancellationTokenSource();
+      listenJob = Task.Run(() => ListenLoop(listenStop.Token), listenStop.Token);
     }
 
-    private void StartGestureValidation(GestureButtonConfig config)
+    private void ListenLoop(CancellationToken token)
     {
-      if (config == null || string.IsNullOrWhiteSpace(config.gestureLabel))
+      while (!token.IsCancellationRequested)
       {
-        Debug.LogWarning("GestureValidationController: gesture label not configured.");
-        return;
+        string line;
+        try
+        {
+          line = sockReader?.ReadLine();
+        }
+        catch (IOException)
+        {
+        AskStopLater("Connection lost", true);
+        break;
       }
 
-      if (source == null)
-      {
-        Debug.LogWarning("GestureValidationController: HandTrackingSource is not assigned.");
-        return;
-      }
-
-      _activeButton = config;
-      _targetGesture = config.gestureLabel.Trim();
-
-      SetButtonInteractable(false);
-      config.triggerButton.interactable = true;
-      config.triggerButton.SetLabel($"Stop {_targetGesture}");
-      if (config.statusLabel != null)
-      {
-        config.statusLabel.text = $"Testing {_targetGesture}...";
-        config.statusLabel.color = Color.yellow;
-      }
-
-      _windowFrames.Clear();
-      _windowTimestamps.Clear();
-      _progressStatus = $"Collecting {_targetGesture} window...";
-      _resultStatus = $"Target: {_targetGesture}\nWaiting for prediction...";
-
-      _cts = new CancellationTokenSource();
-      _isRunning = true;
-
-      EnsureConnectionAsync(_cts.Token).ContinueWith(task =>
-      {
-        if (_cts == null || !_isRunning)
+        if (string.IsNullOrEmpty(line))
         {
-          return;
-        }
-
-        if (task.IsCanceled)
-        {
-          return;
-        }
-
-        if (task.Exception != null)
-        {
-          Debug.LogError($"GestureValidationController: connection failed - {task.Exception.InnerException?.Message}");
-          RequestStop("Failed to connect to inference server.", true);
-          return;
-        }
-
-        _senderTask = Task.Run(() => SenderLoop(_cts.Token), _cts.Token);
-        _receiverTask = Task.Run(() => ReceiverLoop(_cts.Token), _cts.Token);
-      }, TaskScheduler.FromCurrentSynchronizationContext());
-    }
-
-    private void SetButtonInteractable(bool enabled)
-    {
-      foreach (var config in gestureButtons)
-      {
-        if (config?.triggerButton == null)
-        {
+          Thread.Sleep(10);
           continue;
         }
 
-        config.triggerButton.interactable = enabled;
-        if (enabled)
+        Debug.Log("Python says: " + line);
+
+        try
         {
-          var label = string.IsNullOrWhiteSpace(config.gestureLabel)
-            ? "Test Gesture"
-            : $"Test {config.gestureLabel}";
-          config.triggerButton.SetLabel(label);
+          var answer = JsonUtility.FromJson<ModelAnswer>(line);
+          if (answer == null)
+          {
+            continue;
+          }
+
+          if (!string.IsNullOrEmpty(activeLabel))
+          {
+            var prob = ClampProb(answer.prob);
+            var ok = prob >= needProb && answer.confidence >= needConf;
+            var probText = prob.ToString("F2", CultureInfo.InvariantCulture);
+            resultMsg = "Target " + activeLabel + " prob = " + probText;
+
+            if ((answer.match || string.Equals(answer.top1, activeLabel, StringComparison.OrdinalIgnoreCase)) && ok)
+            {
+              resultMsg = "Target " + activeLabel + " prob = " + probText + " (passed)";
+              AskStopLater("Finished", false);
+            }
+          }
+          else
+          {
+            var top = answer.top1_prob > 0 ? answer.top1_prob : answer.prob;
+            resultMsg = "Prediction: " + answer.top1 + " Prob: " + ClampProb(top).ToString("P0", CultureInfo.InvariantCulture);
+          }
+        }
+        catch (Exception ex)
+        {
+          Debug.LogWarning("Failed to parse: " + ex.Message);
         }
       }
     }
 
-    private void UpdateUiText()
+    private void HandleHandFrame(HandTrackingSource.HandFrameData data)
     {
-      if (progressText != null)
-      {
-        progressText.text = _progressStatus;
-      }
-
-      if (resultText != null)
-      {
-        resultText.text = _resultStatus;
-      }
-    }
-
-    private void HandleHandFrame(HandTrackingSource.HandFrameData frame)
-    {
-      if (!_isRunning || !_isConnected)
+      if (!isCollecting || sockWriter == null)
       {
         return;
       }
 
-      var tracked = frame != null && frame.tracked && frame.landmarks != null && frame.landmarks.Length >= 21;
-      if (!tracked && !padMissingFrames)
+      var tracked = data != null && data.tracked && data.landmarks != null && data.landmarks.Length >= 21;
+      if (!tracked && !fillMissing)
       {
         return;
       }
 
-      AppendFrame(frame, tracked);
-
-      var frameCount = _windowFrames.Count;
-      if (frameCount == 0)
+      AddFrame(data, tracked);
+      var count = frameList.Count;
+      if (count == 0)
       {
         return;
       }
 
-      var duration = GetWindowDurationSeconds();
-      var fps = Mathf.Max(1f, targetFps);
-      var minFrames = Mathf.Max(1, Mathf.Max(minimumFrames, Mathf.CeilToInt(windowSeconds * fps)));
-      var targetSeconds = Mathf.Max(windowSeconds, minFrames / fps);
+      var seconds = CalcSeconds();
+      var needFrames = Mathf.Max(minFrames, Mathf.CeilToInt(windowSeconds * Mathf.Max(1f, fakeFps)));
 
-      if (frameCount >= minFrames && duration >= windowSeconds)
+      if (count >= needFrames && seconds >= windowSeconds)
       {
-        Debug.Log($"GestureValidationController: sending window ({frameCount} frames, {duration:F2}s)");
-        SendWindow();
-        _windowFrames.Clear();
-        _windowTimestamps.Clear();
-        _progressStatus = $"Sent window for {_targetGesture} ({duration:F1}s)";
+        SendWindowNow();
+        frameList.Clear();
+        frameTimes.Clear();
+        progressMsg = "Sent window: " + activeLabel;
       }
       else
       {
-        _progressStatus = $"Collecting {_targetGesture}: {duration:F1}s / {targetSeconds:F1}s";
+        progressMsg = $"Collecting {activeLabel}: {seconds:F1}s / {windowSeconds:F1}s";
       }
     }
 
-    private void AppendFrame(HandTrackingSource.HandFrameData frame, bool tracked)
+    private void AddFrame(HandTrackingSource.HandFrameData info, bool tracked)
     {
-      if (frame == null)
-      {
-        return;
-      }
+      var slot = new float[63];
 
-      var frameData = new float[63];
-      if (tracked && frame.landmarks != null)
+      if (tracked && info != null && info.landmarks != null)
       {
-        for (var i = 0; i < 21 && i < frame.landmarks.Length; i++)
+        for (var i = 0; i < 21 && i < info.landmarks.Length; i++)
         {
-          var lm = frame.landmarks[i];
-          var offset = i * 3;
-          frameData[offset] = lm.x;
-          frameData[offset + 1] = lm.y;
-          frameData[offset + 2] = lm.z;
+          var lm = info.landmarks[i];
+          var idx = i * 3;
+          slot[idx] = lm.x;
+          slot[idx + 1] = lm.y;
+          slot[idx + 2] = lm.z;
         }
       }
 
-      _windowFrames.Add(frameData);
-      _windowTimestamps.Add(frame.timestampMillisec);
+      frameList.Add(slot);
+      frameTimes.Add(info != null ? info.timestampMillisec : 0);
     }
 
-    private float GetWindowDurationSeconds()
+    private float CalcSeconds()
     {
-      if (_windowTimestamps.Count >= 2)
+      if (frameTimes.Count >= 2)
       {
-        long first = _windowTimestamps[0];
-        long last = _windowTimestamps[_windowTimestamps.Count - 1];
+        var first = frameTimes[0];
+        var last = frameTimes[frameTimes.Count - 1];
         if (last > first)
         {
           return (last - first) / 1000f;
         }
       }
 
-      return _windowFrames.Count / Mathf.Max(1f, targetFps);
+      return frameList.Count / Mathf.Max(1f, fakeFps);
     }
 
-    private void SendWindow()
+    private void SendWindowNow()
     {
-      var frameCount = _windowFrames.Count;
-      if (frameCount == 0)
+      if (sockWriter == null)
       {
         return;
       }
 
-      var durationSeconds = GetWindowDurationSeconds();
-      var sb = new StringBuilder(frameCount * 512);
+      var count = frameList.Count;
+      var sb = new StringBuilder();
       sb.Append("{\"sequence\":[");
 
-      var inv = CultureInfo.InvariantCulture;
-      for (var f = 0; f < frameCount; f++)
+      var culture = CultureInfo.InvariantCulture;
+      for (var f = 0; f < count; f++)
       {
-        var frame = _windowFrames[f];
+        var frm = frameList[f];
         sb.Append('[');
         for (var i = 0; i < 21; i++)
         {
           var idx = i * 3;
           sb.Append('[');
-          sb.Append(frame[idx].ToString(inv));
+          sb.Append(frm[idx].ToString(culture));
           sb.Append(',');
-          sb.Append(frame[idx + 1].ToString(inv));
+          sb.Append(frm[idx + 1].ToString(culture));
           sb.Append(',');
-          sb.Append(frame[idx + 2].ToString(inv));
+          sb.Append(frm[idx + 2].ToString(culture));
           sb.Append(']');
           if (i < 20)
           {
@@ -384,24 +368,142 @@ namespace HandControl
           }
         }
         sb.Append(']');
-        if (f < frameCount - 1)
+        if (f < count - 1)
         {
           sb.Append(',');
         }
       }
 
       sb.Append("],\"frame_count\":");
-      sb.Append(frameCount);
+      sb.Append(count);
       sb.Append(",\"duration\":");
-      sb.Append(durationSeconds.ToString(inv));
+      sb.Append(CalcSeconds().ToString(culture));
       sb.Append(",\"target_label\":\"");
-      sb.Append(EscapeJsonString(_targetGesture ?? string.Empty));
+      sb.Append(SimpleEscape(activeLabel ?? string.Empty));
       sb.Append("\"}\n");
 
-      QueueMessage(sb.ToString());
+      try
+      {
+        sockWriter.Write(sb.ToString());
+      }
+      catch (IOException ex)
+      {
+        Debug.LogError("Send failed: " + ex.Message);
+        AskStopLater("Send error", true);
+      }
     }
 
-    private static string EscapeJsonString(string value)
+    private void StopCollect(string info, bool resetResult)
+    {
+      if (!isCollecting && sock == null)
+      {
+        progressMsg = info;
+        return;
+      }
+
+      isCollecting = false;
+
+      if (activeButton != null && activeButton.myButton != null)
+      {
+        UpdateButtonLabel(activeButton, false);
+      }
+
+      if (activeButton != null && activeButton.myStatus != null)
+      {
+        activeButton.myStatus.text = info;
+        activeButton.myStatus.color = info.IndexOf("finish", StringComparison.OrdinalIgnoreCase) >= 0 ? Color.green : Color.white;
+      }
+
+      foreach (var item in buttons)
+      {
+        if (item?.myButton != null)
+        {
+          item.myButton.interactable = true;
+        }
+      }
+
+      try
+      {
+        sockWriter?.Write("{\"command\":\"stop\"}\n");
+      }
+      catch (Exception) { }
+
+      listenStop?.Cancel();
+      try
+      {
+        if (listenJob != null && !listenJob.IsCompleted)
+        {
+          listenJob.Wait(100);
+        }
+      }
+      catch (Exception) { }
+
+      sockReader?.Dispose();
+      sockWriter?.Dispose();
+      sock?.Close();
+
+      sockReader = null;
+      sockWriter = null;
+      sock = null;
+      listenJob = null;
+      listenStop = null;
+
+      frameList.Clear();
+      frameTimes.Clear();
+
+      if (resetResult)
+      {
+        resultMsg = "Result: --";
+      }
+
+      progressMsg = info;
+      activeLabel = null;
+      activeButton = null;
+    }
+
+    private void AskStopLater(string text, bool reset)
+    {
+      lock (stopLock)
+      {
+        stopMsgQueue.Enqueue(text);
+        stopResetQueue.Enqueue(reset);
+      }
+    }
+
+    private void CheckPendingStop()
+    {
+      string text = null;
+      bool reset = true;
+
+      lock (stopLock)
+      {
+        if (stopMsgQueue.Count > 0)
+        {
+          text = stopMsgQueue.Dequeue();
+          reset = stopResetQueue.Dequeue();
+        }
+      }
+
+      if (text != null)
+      {
+        StopCollect(text, reset);
+      }
+    }
+
+    private void UpdateUi()
+    {
+      if (progressText != null)
+      {
+        progressText.text = progressMsg;
+      }
+
+      if (resultText != null)
+      {
+        resultText.text = resultMsg;
+      }
+    }
+
+    private static string SimpleEscape(string value)
     {
       if (string.IsNullOrEmpty(value))
       {
@@ -411,287 +513,28 @@ namespace HandControl
       return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
-    private static float ClampProbability(float value)
+    private static float ClampProb(float v)
     {
-      if (float.IsNaN(value) || float.IsInfinity(value))
+      if (float.IsNaN(v) || float.IsInfinity(v))
       {
         return 0f;
       }
 
-      return Mathf.Clamp01(value);
+      return Mathf.Clamp01(v);
     }
 
-    private void QueueMessage(string message)
+    private void UpdateButtonLabel(ButtonInfo info, bool running)
     {
-      _sendQueue.Enqueue(message);
-    }
-
-    private async Task EnsureConnectionAsync(CancellationToken token)
-    {
-      lock (_connectionLock)
+      if (info?.myButton == null)
       {
-        if (_client != null)
-        {
-          return;
-        }
-      }
-
-      var client = new TcpClient();
-      using (token.Register(() => client.Close()))
-      {
-        await client.ConnectAsync(host, port);
-      }
-
-      var stream = client.GetStream();
-      var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true };
-      var reader = new StreamReader(stream, Encoding.UTF8);
-
-      lock (_connectionLock)
-      {
-        _client = client;
-        _writer = writer;
-        _reader = reader;
-        _isConnected = true;
-      }
-    }
-
-    private void RequestStop(string message, bool resetResult = true)
-    {
-      _stopRequests.Enqueue((message, resetResult));
-    }
-
-    private void StopGestureInternal(string message, bool updateStatus, bool resetResult = true)
-    {
-      if (!_isRunning && !_isConnected)
-      {
-        if (updateStatus)
-        {
-          _progressStatus = message;
-        }
         return;
       }
 
-      _isRunning = false;
-      _targetGesture = null;
-
-      if (_activeButton != null)
+      var label = string.IsNullOrWhiteSpace(info.myLabel) ? "Test Gesture" : info.myLabel;
+      var txt = info.myButton.GetComponentInChildren<Text>();
+      if (txt != null)
       {
-        if (_activeButton.triggerButton != null)
-        {
-          var label = string.IsNullOrWhiteSpace(_activeButton.gestureLabel)
-            ? "Test Gesture"
-            : $"Test {_activeButton.gestureLabel}";
-          _activeButton.triggerButton.SetLabel(label);
-        }
-
-        if (_activeButton.statusLabel != null)
-        {
-          _activeButton.statusLabel.text = message;
-          _activeButton.statusLabel.color = message.Contains("reach", StringComparison.OrdinalIgnoreCase)
-            ? Color.green
-            : Color.white;
-        }
-      }
-
-      SetButtonInteractable(true);
-
-      try
-      {
-        if (_isConnected)
-        {
-          QueueMessage("{\"command\":\"stop\"}\n");
-        }
-      }
-      catch (Exception ex)
-      {
-        Debug.LogWarning($"GestureValidationController: failed to send stop command - {ex.Message}");
-      }
-
-      _cts?.Cancel();
-
-      try
-      {
-        _senderTask?.Wait(100);
-        _receiverTask?.Wait(100);
-      }
-      catch (AggregateException) { }
-      catch (Exception) { }
-
-      lock (_connectionLock)
-      {
-        _writer?.Dispose();
-        _reader?.Dispose();
-        _client?.Close();
-        _writer = null;
-        _reader = null;
-        _client = null;
-        _isConnected = false;
-      }
-
-      _cts?.Dispose();
-      _cts = null;
-      _senderTask = null;
-      _receiverTask = null;
-
-      _windowFrames.Clear();
-      _windowTimestamps.Clear();
-
-      if (resetResult)
-      {
-        _resultStatus = "Result: --";
-      }
-
-      if (updateStatus)
-      {
-        _progressStatus = message;
-      }
-
-      _activeButton = null;
-    }
-
-    private async Task SenderLoop(CancellationToken token)
-    {
-      try
-      {
-        while (!token.IsCancellationRequested)
-        {
-          if (_sendQueue.TryDequeue(out var message))
-          {
-            StreamWriter writer;
-            lock (_connectionLock)
-            {
-              writer = _writer;
-            }
-
-            if (writer == null)
-            {
-              await Task.Delay(10, token);
-              continue;
-            }
-
-            try
-            {
-              await writer.WriteAsync(message);
-            }
-            catch (IOException ex)
-            {
-              Debug.LogError($"GestureValidationController: send failed - {ex.Message}");
-              RequestStop("Send failed. Validation stopped.", true);
-              return;
-            }
-          }
-          else
-          {
-            await Task.Delay(5, token);
-          }
-        }
-      }
-      catch (OperationCanceledException)
-      {
-        // expected on cancellation
-      }
-      catch (Exception ex)
-      {
-        Debug.LogError($"GestureValidationController: SenderLoop exception - {ex.Message}");
-        RequestStop("Sender loop error. Validation stopped.", true);
-      }
-    }
-
-    private async Task ReceiverLoop(CancellationToken token)
-    {
-      try
-      {
-        while (!token.IsCancellationRequested)
-        {
-          StreamReader reader;
-          lock (_connectionLock)
-          {
-            reader = _reader;
-          }
-
-          if (reader == null)
-          {
-            await Task.Delay(10, token);
-            continue;
-          }
-
-          string line;
-          try
-          {
-            line = await reader.ReadLineAsync();
-          }
-          catch (IOException ex)
-          {
-            Debug.LogError($"GestureValidationController: receive failed - {ex.Message}");
-            RequestStop("Connection lost. Validation stopped.", true);
-            return;
-          }
-
-          if (line == null)
-          {
-            RequestStop("Python server closed the connection.", true);
-            return;
-          }
-
-          if (string.IsNullOrWhiteSpace(line))
-          {
-            continue;
-          }
-
-          Debug.Log($"GestureValidationController: received raw -> {line}");
-
-          try
-          {
-            var result = JsonUtility.FromJson<GestureResult>(line);
-            if (result == null)
-            {
-              continue;
-            }
-
-            if (!string.IsNullOrEmpty(_targetGesture))
-            {
-              var targetProb = ClampProbability(result.prob);
-              var probText = $"{targetProb:P0}";
-              var top1Matches = result.match;
-              if (!top1Matches && !string.IsNullOrEmpty(result.top1))
-              {
-                top1Matches = string.Equals(result.top1, _targetGesture, StringComparison.OrdinalIgnoreCase);
-              }
-
-              var thresholdMet = targetProb >= successProbabilityThreshold &&
-                                 result.confidence >= successConfidenceThreshold;
-
-              var top1Display = string.IsNullOrEmpty(result.top1) ? "Unknown" : result.top1;
-              _resultStatus = $"Target: {_targetGesture}\nProbability: {probText}\nConfidence: {result.confidence:F2}\nTop-1: {top1Display}";
-
-              if (top1Matches && thresholdMet)
-              {
-                _resultStatus = $"Gesture reach the standard!\n{_targetGesture} ({probText})";
-                RequestStop("Gesture reach the standard.", false);
-              }
-            }
-            else
-            {
-              var topProb = result.top1_prob > 0f ? result.top1_prob : result.prob;
-              var probText = $"{ClampProbability(topProb):P0}";
-              var topLabel = string.IsNullOrEmpty(result.top1) ? "Unknown" : result.top1;
-              _resultStatus = $"Prediction: {topLabel}\nProbability: {probText}\nConfidence: {result.confidence:F2}";
-            }
-          }
-          catch (Exception ex)
-          {
-            Debug.LogWarning($"GestureValidationController: failed to parse result - {ex.Message}\nRaw: {line}");
-          }
-        }
-      }
-      catch (OperationCanceledException)
-      {
-        // expected on cancellation
-      }
-      catch (Exception ex)
-      {
-        Debug.LogError($"GestureValidationController: ReceiverLoop exception - {ex.Message}");
-        RequestStop("Receiver loop error. Validation stopped.", true);
+        txt.text = running ? ("Stop " + label) : ("Test " + label);
       }
     }
   }

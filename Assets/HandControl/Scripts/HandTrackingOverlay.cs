@@ -4,125 +4,115 @@ using UnityEngine.UI;
 
 namespace HandControl
 {
-  [DefaultExecutionOrder(-5)]
   public class HandTrackingOverlay : MonoBehaviour
   {
-    [SerializeField] private HandTrackingSource source;
-    [SerializeField] private RectTransform previewRect;
-    [SerializeField] private Color landmarkColor = Color.cyan;
-    [SerializeField] private float landmarkSize = 6f;
-    [SerializeField] private bool mirrorX = true;
-    [SerializeField] private bool mirrorY = false;
+    [SerializeField] private HandTrackingSource handSource;
+    [SerializeField] private RectTransform drawArea;
+    [SerializeField] private Color dotColor = Color.cyan;
+    [SerializeField] private float dotSize = 6f;
+    [SerializeField] private bool flipX = true;
+    [SerializeField] private bool flipY = false;
 
-    private readonly List<Image> _landmarkImages = new();
-    private HandTrackingSource.HandFrameData _frameCache;
+    private readonly List<Image> dotImages = new();
+    private HandTrackingSource.HandFrameData latestFrame;
 
     private void Awake()
     {
-      EnsureLandmarkImages(21);
+      MakeDots(21);
+      TurnDots(false);
     }
 
     private void OnEnable()
     {
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame += OnHandFrame;
+        handSource.OnHandFrame += GotFrame;
       }
     }
 
     private void OnDisable()
     {
-      if (source != null)
+      if (handSource != null)
       {
-        source.OnHandFrame -= OnHandFrame;
+        handSource.OnHandFrame -= GotFrame;
       }
-      SetActive(false);
+      TurnDots(false);
     }
 
-    private void OnHandFrame(HandTrackingSource.HandFrameData frame)
+    private void GotFrame(HandTrackingSource.HandFrameData frame)
     {
-      _frameCache = frame;
-      UpdateOverlay();
+      latestFrame = frame;
+      DrawDots();
     }
 
-    private void UpdateOverlay()
+    private void DrawDots()
     {
-      if (previewRect == null)
+      if (drawArea == null)
       {
         return;
       }
 
-      if (_frameCache == null || !_frameCache.tracked || _frameCache.landmarks == null || _frameCache.landmarks.Length == 0)
+      if (latestFrame == null || !latestFrame.tracked || latestFrame.landmarks == null)
       {
-        SetActive(false);
+        TurnDots(false);
         return;
       }
 
-      EnsureLandmarkImages(_frameCache.landmarks.Length);
-      var rect = previewRect.rect;
+      MakeDots(latestFrame.landmarks.Length);
+      var rect = drawArea.rect;
 
-      for (var i = 0; i < _landmarkImages.Count; i++)
+      for (var i = 0; i < dotImages.Count; i++)
       {
-        var image = _landmarkImages[i];
-        if (i >= _frameCache.landmarks.Length)
+        var image = dotImages[i];
+        if (i >= latestFrame.landmarks.Length)
         {
           image.enabled = false;
           continue;
         }
 
-        var landmark = _frameCache.landmarks[i];
-        var normalizedX = landmark.x;
-        var normalizedY = landmark.y;
+        var lm = latestFrame.landmarks[i];
+        var x = flipX ? 1f - lm.x : lm.x;
+        var y = flipY ? 1f - lm.y : lm.y;
 
-        if (mirrorX)
-        {
-          normalizedX = 1f - normalizedX;
-        }
-
-        if (mirrorY)
-        {
-          normalizedY = 1f - normalizedY;
-        }
-
-        var anchoredPos = new Vector2(
-          (normalizedX - 0.5f) * rect.width,
-          (0.5f - normalizedY) * rect.height
+        var pos = new Vector2(
+          (x - 0.5f) * rect.width,
+          (0.5f - y) * rect.height
         );
 
         var rt = image.rectTransform;
-        rt.anchoredPosition = anchoredPos;
-        rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, landmarkSize);
-        rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, landmarkSize);
+        rt.anchoredPosition = pos;
+        rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, dotSize);
+        rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, dotSize);
         image.enabled = true;
       }
     }
 
-    private void SetActive(bool value)
+    private void MakeDots(int count)
     {
-      foreach (var image in _landmarkImages)
-      {
-        if (image != null)
-        {
-          image.enabled = value;
-        }
-      }
-    }
-
-    private void EnsureLandmarkImages(int count)
-    {
-      if (previewRect == null)
+      if (drawArea == null)
       {
         return;
       }
 
-      while (_landmarkImages.Count < count)
+      while (dotImages.Count < count)
       {
-        var go = new GameObject($"Landmark_{_landmarkImages.Count}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        go.transform.SetParent(previewRect, false);
-        var image = go.GetComponent<Image>();
-        image.color = landmarkColor;
-        image.raycastTarget = false;
-        _landmarkImages.Add(image);
+        var go = new GameObject($"dot_{dotImages.Count}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(drawArea, false);
+        var img = go.GetComponent<Image>();
+        img.color = dotColor;
+        img.raycastTarget = false;
+        dotImages.Add(img);
+      }
+    }
+
+    private void TurnDots(bool value)
+    {
+      foreach (var img in dotImages)
+      {
+        if (img != null)
+        {
+          img.enabled = value;
+        }
       }
     }
   }

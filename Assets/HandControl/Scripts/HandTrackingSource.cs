@@ -4,12 +4,11 @@ using System.Collections.Generic;
 using Mediapipe;
 using Mediapipe.Tasks.Components.Containers;
 using Mediapipe.Tasks.Vision.HandLandmarker;
-using Tasks = Mediapipe.Tasks;
 using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
 using Mediapipe.Unity.Sample;
 using UnityEngine;
-using UnityEngine.Rendering;
+using Tasks = Mediapipe.Tasks;
 
 namespace HandControl
 {
@@ -17,17 +16,14 @@ namespace HandControl
   public class HandTrackingSource : BaseRunner
   {
     [Serializable]
-    public class Settings
+    public class SimpleSettings
     {
-      public Tasks.Core.BaseOptions.Delegate inferenceDelegate = Tasks.Core.BaseOptions.Delegate.CPU;
-      public ImageReadMode imageReadMode = ImageReadMode.CPU;
-      public Tasks.Vision.Core.RunningMode runningMode = Tasks.Vision.Core.RunningMode.LIVE_STREAM;
-      [Range(1, 2)] public int numHands = 1;
-      [Range(0f, 1f)] public float minHandDetectionConfidence = 0.5f;
-      [Range(0f, 1f)] public float minHandPresenceConfidence = 0.5f;
-      [Range(0f, 1f)] public float minTrackingConfidence = 0.5f;
-      [Tooltip("Relative path under StreamingAssets")] public string modelAsset = "hand_landmarker.bytes";
-      [Tooltip("Number of frames cached for CPU read")] public int texturePoolSize = 4;
+      [Range(1, 2)] public int handCount = 1;
+      [Range(0f, 1f)] public float detectScore = 0.5f;
+      [Range(0f, 1f)] public float presenceScore = 0.5f;
+      [Range(0f, 1f)] public float followScore = 0.5f;
+      [Tooltip("Relative path under StreamingAssets")] public string modelFile = "hand_landmarker.bytes";
+      [Tooltip("How many frames to keep around for CPU readback")] public int extraTextures = 4;
     }
 
     [Serializable]
@@ -39,7 +35,7 @@ namespace HandControl
       public long timestampMillisec;
       public Vector3[] landmarks = Array.Empty<Vector3>();
 
-      public void EnsureCapacity(int count)
+      public void MakeRoom(int count)
       {
         if (count <= 0)
         {
@@ -59,8 +55,7 @@ namespace HandControl
         isRight = other.isRight;
         handednessScore = other.handednessScore;
         timestampMillisec = other.timestampMillisec;
-        EnsureCapacity(other.landmarks?.Length ?? 0);
-
+        MakeRoom(other.landmarks?.Length ?? 0);
         for (var i = 0; i < landmarks.Length; i++)
         {
           landmarks[i] = other.landmarks[i];
@@ -68,28 +63,27 @@ namespace HandControl
       }
     }
 
-    [SerializeField] private Settings settings = new Settings();
+    [SerializeField] private SimpleSettings settings = new SimpleSettings();
 
     public event Action<HandFrameData> OnHandFrame;
 
-    private TextureFramePool _texturePool;
-    private HandLandmarker _handLandmarker;
-    private Coroutine _runner;
-    private Tasks.Vision.Core.ImageProcessingOptions _imageProcessingOptions;
-    private HandLandmarkerResult _syncResult;
-    private bool _inputHorizontallyFlipped;
+    private TextureFramePool framePool;
+    private HandLandmarker handDetector;
+    private Coroutine loopRoutine;
+    private Tasks.Vision.Core.ImageProcessingOptions imageOptions;
+    private bool sourceWasFlipped;
 
-    private readonly object _frameLock = new();
-    private readonly HandFrameData _latestFrame = new();
-    private readonly HandFrameData _eventFrame = new();
-    private bool _frameDirty;
+    private readonly object frameLock = new();
+    private readonly HandFrameData lastFrame = new();
+    private readonly HandFrameData eventFrame = new();
+    private bool frameReady;
 
     public override void Play()
     {
       base.Play();
-      if (_runner == null)
+      if (loopRoutine == null)
       {
-        _runner = StartCoroutine(Run());
+        loopRoutine = StartCoroutine(RunCoroutine());
       }
     }
 
@@ -108,65 +102,65 @@ namespace HandControl
     public override void Stop()
     {
       base.Stop();
-      if (_runner != null)
+      if (loopRoutine != null)
       {
-        StopCoroutine(_runner);
-        _runner = null;
+        StopCoroutine(loopRoutine);
+        loopRoutine = null;
       }
       TearDown();
     }
 
     private void Update()
     {
-      if (!_frameDirty)
+      if (!frameReady)
       {
         return;
       }
 
       HandFrameData snapshot = null;
-      lock (_frameLock)
+      lock (frameLock)
       {
-        if (!_frameDirty)
+        if (!frameReady)
         {
           return;
         }
 
-        _eventFrame.CopyFrom(_latestFrame);
-        _frameDirty = false;
-        snapshot = _eventFrame;
+        eventFrame.CopyFrom(lastFrame);
+        frameReady = false;
+        snapshot = eventFrame;
       }
 
       OnHandFrame?.Invoke(snapshot);
     }
 
-    private IEnumerator Run()
+    private IEnumerator RunCoroutine()
     {
-      yield return AssetLoader.PrepareAssetAsync(settings.modelAsset);
+      yield return AssetLoader.PrepareAssetAsync(settings.modelFile);
 
-      var options = BuildOptions(settings.runningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnLiveStreamResult : null);
-      _handLandmarker = HandLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
+      var options = BuildOptions(OnLiveStreamResult);
+      handDetector = HandLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
 
       var imageSource = ImageSourceProvider.ImageSource;
       yield return imageSource.Play();
 
       if (!imageSource.isPrepared)
       {
-        Debug.LogError("HandTrackingSource: failed to start ImageSource.");
+        Debug.LogError("HandTrackingSource: camera refused to start.");
         yield break;
       }
 
-      _texturePool = new TextureFramePool(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, Mathf.Max(settings.texturePoolSize, 2));
+      framePool = new TextureFramePool(
+        imageSource.textureWidth,
+        imageSource.textureHeight,
+        TextureFormat.RGBA32,
+        Mathf.Max(settings.extraTextures, 2)
+      );
 
-      var transformationOptions = imageSource.GetTransformationOptions();
-      var flipHorizontally = transformationOptions.flipHorizontally;
-      var flipVertically = transformationOptions.flipVertically;
-      _inputHorizontallyFlipped = flipHorizontally;
-      _imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformationOptions.rotationAngle);
+      var transformOpts = imageSource.GetTransformationOptions();
+      sourceWasFlipped = transformOpts.flipHorizontally;
+      imageOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformOpts.rotationAngle);
 
-      var waitForEndOfFrame = new WaitForEndOfFrame();
-      AsyncGPUReadbackRequest req = default;
-      var waitUntilReqDone = new WaitUntil(() => req.done);
-      _syncResult = HandLandmarkerResult.Alloc(settings.numHands);
+      var waitEOF = new WaitForEndOfFrame();
 
       while (true)
       {
@@ -175,86 +169,38 @@ namespace HandControl
           yield return new WaitWhile(() => isPaused);
         }
 
-        if (!_texturePool.TryGetTextureFrame(out var textureFrame))
+        if (!framePool.TryGetTextureFrame(out var textureFrame))
         {
-          yield return waitForEndOfFrame;
+          yield return waitEOF;
           continue;
         }
 
-        Image image = null;
-        switch (settings.imageReadMode)
-        {
-        case ImageReadMode.CPU:
-            yield return waitForEndOfFrame;
-            textureFrame.ReadTextureOnCPU(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
-            image = textureFrame.BuildCPUImage();
-            textureFrame.Release();
-            break;
-          case ImageReadMode.CPUAsync:
-            req = textureFrame.ReadTextureAsync(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
-            yield return waitUntilReqDone;
-            if (req.hasError)
-            {
-              Debug.LogWarning("HandTrackingSource: failed to read texture from source.");
-              continue;
-            }
-            image = textureFrame.BuildCPUImage();
-            textureFrame.Release();
-            break;
-          default:
-            Debug.LogError($"HandTrackingSource: {settings.imageReadMode} is not supported in this script.");
-            yield break;
-        }
+        yield return waitEOF;
+        textureFrame.ReadTextureOnCPU(imageSource.GetCurrentTexture(), transformOpts.flipHorizontally, transformOpts.flipVertically);
+        var cpuImage = textureFrame.BuildCPUImage();
+        textureFrame.Release();
 
-        ProcessImage(image);
+        PushImage(cpuImage);
       }
     }
 
     private HandLandmarkerOptions BuildOptions(HandLandmarkerOptions.ResultCallback callback)
     {
       return new HandLandmarkerOptions(
-        new Tasks.Core.BaseOptions(settings.inferenceDelegate, modelAssetPath: settings.modelAsset),
-        runningMode: settings.runningMode,
-        numHands: settings.numHands,
-        minHandDetectionConfidence: settings.minHandDetectionConfidence,
-        minHandPresenceConfidence: settings.minHandPresenceConfidence,
-        minTrackingConfidence: settings.minTrackingConfidence,
+        new Tasks.Core.BaseOptions(Tasks.Core.BaseOptions.Delegate.CPU, modelAssetPath: settings.modelFile),
+        runningMode: Tasks.Vision.Core.RunningMode.LIVE_STREAM,
+        numHands: settings.handCount,
+        minHandDetectionConfidence: settings.detectScore,
+        minHandPresenceConfidence: settings.presenceScore,
+        minTrackingConfidence: settings.followScore,
         resultCallback: callback
       );
     }
 
-    private void ProcessImage(Image image)
+    private void PushImage(Image image)
     {
       var timestamp = GetCurrentTimestampMillisec();
-
-      switch (settings.runningMode)
-      {
-        case Tasks.Vision.Core.RunningMode.IMAGE:
-          if (_handLandmarker.TryDetect(image, _imageProcessingOptions, ref _syncResult))
-          {
-            PublishResult(_syncResult, timestamp);
-          }
-          else
-          {
-            PublishNoResult(timestamp);
-          }
-          break;
-
-        case Tasks.Vision.Core.RunningMode.VIDEO:
-          if (_handLandmarker.TryDetectForVideo(image, timestamp, _imageProcessingOptions, ref _syncResult))
-          {
-            PublishResult(_syncResult, timestamp);
-          }
-          else
-          {
-            PublishNoResult(timestamp);
-          }
-          break;
-
-        case Tasks.Vision.Core.RunningMode.LIVE_STREAM:
-          _handLandmarker.DetectAsync(image, timestamp, _imageProcessingOptions);
-          break;
-      }
+      handDetector.DetectAsync(image, timestamp, imageOptions);
     }
 
     private void OnLiveStreamResult(HandLandmarkerResult result, Image image, long timestamp)
@@ -264,7 +210,7 @@ namespace HandControl
 
     private void PublishResult(HandLandmarkerResult result, long timestamp)
     {
-      lock (_frameLock)
+      lock (frameLock)
       {
         if (result.handLandmarks == null || result.handLandmarks.Count == 0)
         {
@@ -273,25 +219,25 @@ namespace HandControl
         }
 
         var firstHand = result.handLandmarks[0].landmarks;
-        _latestFrame.tracked = true;
-        _latestFrame.timestampMillisec = timestamp;
-        _latestFrame.EnsureCapacity(firstHand.Count);
+        lastFrame.tracked = true;
+        lastFrame.timestampMillisec = timestamp;
+        lastFrame.MakeRoom(firstHand.Count);
         for (var i = 0; i < firstHand.Count; i++)
         {
           var landmark = firstHand[i];
-          _latestFrame.landmarks[i] = new Vector3(landmark.x, landmark.y, landmark.z);
+          lastFrame.landmarks[i] = new Vector3(landmark.x, landmark.y, landmark.z);
         }
 
-        _latestFrame.isRight = DetermineHandedness(result.handedness, out var score);
-        _latestFrame.handednessScore = score;
+        lastFrame.isRight = CalculateHandedness(result.handedness, out var score);
+        lastFrame.handednessScore = score;
 
-        _frameDirty = true;
+        frameReady = true;
       }
     }
 
     private void PublishNoResult(long timestamp)
     {
-      lock (_frameLock)
+      lock (frameLock)
       {
         PublishNoResultLocked(timestamp);
       }
@@ -299,18 +245,18 @@ namespace HandControl
 
     private void PublishNoResultLocked(long timestamp)
     {
-      _latestFrame.tracked = false;
-      _latestFrame.timestampMillisec = timestamp;
-      _latestFrame.handednessScore = 0f;
-      _latestFrame.isRight = true;
-      _latestFrame.EnsureCapacity(0);
-      _frameDirty = true;
+      lastFrame.tracked = false;
+      lastFrame.timestampMillisec = timestamp;
+      lastFrame.handednessScore = 0f;
+      lastFrame.isRight = true;
+      lastFrame.MakeRoom(0);
+      frameReady = true;
     }
 
-    private bool DetermineHandedness(List<Classifications> handedness, out float score)
+    private bool CalculateHandedness(List<Classifications> handedness, out float score)
     {
       var isRight = InferHandedness(handedness, out score);
-      if (_inputHorizontallyFlipped)
+      if (sourceWasFlipped)
       {
         isRight = !isRight;
       }
@@ -333,16 +279,17 @@ namespace HandControl
 
       var category = categories[0];
       score = category.score;
-      return !string.IsNullOrEmpty(category.categoryName) && category.categoryName.IndexOf("right", StringComparison.OrdinalIgnoreCase) >= 0;
+      return !string.IsNullOrEmpty(category.categoryName) &&
+             category.categoryName.IndexOf("right", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void TearDown()
     {
-      _texturePool?.Dispose();
-      _texturePool = null;
+      framePool?.Dispose();
+      framePool = null;
 
-      _handLandmarker?.Close();
-      _handLandmarker = null;
+      handDetector?.Close();
+      handDetector = null;
 
       var imageSource = ImageSourceProvider.ImageSource;
       imageSource?.Stop();

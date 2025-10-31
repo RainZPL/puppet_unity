@@ -4,133 +4,115 @@ using UnityEngine.Animations.Rigging;
 
 namespace HandControl
 {
-  /// <summary>
-  /// Maps MediaPipe hand landmarks to rig constraints.
-  /// Thumb drives the right arm, ring finger drives the left arm,
-  /// index finger drives head motion, and wrist rotation drives body yaw.
-  /// </summary>
   [DefaultExecutionOrder(-5)]
   public class HandRigConstraintDriver : MonoBehaviour
   {
     [Serializable]
-    private class ArmIkConfig
+    private class ArmStuff
     {
-      public TwoBoneIKConstraint constraint;
+      public TwoBoneIKConstraint rig;
       public Transform target;
       public Transform hint;
-      [Tooltip("Direction the IK target moves when the arm raises. Local space of the target parent.")]
-      public Vector3 shoulderDirection = new Vector3(0f, 0.35f, 0.2f);
+      public Vector3 shoulderDir = new(0f, 0.35f, 0.2f);
       public float shoulderDistance = 0.35f;
-      [Tooltip("Direction the hint moves when the elbow bends. Local space of the hint parent.")]
-      public Vector3 elbowDirection = new Vector3(0.2f, -0.15f, 0.15f);
+      public Vector3 elbowDir = new(0.2f, -0.15f, 0.15f);
       public float elbowDistance = 0.25f;
-      [Range(0f, 1f)] public float weightMultiplier = 1f;
-      [Tooltip("Per-axis multiplier converting finger delta (normalized hand space) into IK target offset (meters).")]
-      public Vector3 targetPositionMultiplier = new Vector3(0.45f, 0.45f, 0.45f);
-      [Tooltip("Per-axis multiplier converting finger delta into IK hint offset (meters).")]
-      public Vector3 hintPositionMultiplier = new Vector3(0.35f, 0.35f, 0.35f);
+      [Range(0f, 1f)] public float weightScale = 1f;
+      public Vector3 targetScale = new(0.45f, 0.45f, 0.45f);
+      public Vector3 hintScale = new(0.35f, 0.35f, 0.35f);
 
-      [HideInInspector] public bool restCaptured;
+      [HideInInspector] public bool hasRest;
       [HideInInspector] public Vector3 targetRest;
       [HideInInspector] public Vector3 hintRest;
-      [HideInInspector] public Vector3 dynamicTargetOffset;
-      [HideInInspector] public Vector3 dynamicHintOffset;
+      [HideInInspector] public Vector3 targetOffset;
+      [HideInInspector] public Vector3 hintOffset;
       [HideInInspector] public Vector3 fingerRestDelta;
-      [HideInInspector] public Vector3 fingerTipRestRelative;
+      [HideInInspector] public Vector3 fingerTipRest;
       [HideInInspector] public bool fingerRestCaptured;
       [HideInInspector] public float fingerCurlRest;
     }
 
     [SerializeField] private HandTrackingSource source;
 
-    [Header("Animation Rigging Targets")]
-    [SerializeField] private ArmIkConfig rightArm = new ArmIkConfig();
-    [SerializeField] private ArmIkConfig leftArm = new ArmIkConfig();
+    [Header("Rig targets")]
+    [SerializeField] private ArmStuff rightArm = new();
+    [SerializeField] private ArmStuff leftArm = new();
     [SerializeField] private Transform headTarget;
-    [SerializeField] private Vector3 headYawAxis = new Vector3(0.3f, 0f, 0.3f);
-    [SerializeField] private Vector3 headPitchAxis = new Vector3(0f, 0.4f, 0.2f);
+    [SerializeField] private Vector3 headYawAxis = new(0.3f, 0f, 0.3f);
+    [SerializeField] private Vector3 headPitchAxis = new(0f, 0.4f, 0.2f);
     [SerializeField] private float headYawRange = 0.2f;
     [SerializeField] private float headPitchRange = 0.2f;
-    [SerializeField] private float headMotionGain = 0.8f;
+    [SerializeField] private float headGain = 0.8f;
 
-    [Header("Bone Rotation Mapping")]
-    [SerializeField] private Transform rightUpperArmBone;
-    [SerializeField] private Transform rightForearmBone;
-    [SerializeField] private Vector3 rightUpperArmAxis = new Vector3(1f, 0f, 0f);
-    [SerializeField] private float rightUpperArmAngle = 80f;
-    [SerializeField] private Vector3 rightForearmAxis = new Vector3(1f, 0f, 0f);
-    [SerializeField] private float rightForearmAngle = 110f;
+    [Header("Extra bone rotation")]
+    [SerializeField] private Transform rightUpperBone;
+    [SerializeField] private Transform rightForeBone;
+    [SerializeField] private Vector3 rightUpperAxis = new(1f, 0f, 0f);
+    [SerializeField] private float rightUpperAngle = 80f;
+    [SerializeField] private Vector3 rightForeAxis = new(1f, 0f, 0f);
+    [SerializeField] private float rightForeAngle = 110f;
+    [SerializeField] private Transform leftUpperBone;
+    [SerializeField] private Transform leftForeBone;
+    [SerializeField] private Vector3 leftUpperAxis = new(1f, 0f, 0f);
+    [SerializeField] private float leftUpperAngle = 80f;
+    [SerializeField] private Vector3 leftForeAxis = new(1f, 0f, 0f);
+    [SerializeField] private float leftForeAngle = 110f;
 
-    [SerializeField] private Transform leftUpperArmBone;
-    [SerializeField] private Transform leftForearmBone;
-    [SerializeField] private Vector3 leftUpperArmAxis = new Vector3(1f, 0f, 0f);
-    [SerializeField] private float leftUpperArmAngle = 80f;
-    [SerializeField] private Vector3 leftForearmAxis = new Vector3(1f, 0f, 0f);
-    [SerializeField] private float leftForearmAngle = 110f;
-
-    [Header("Body Orientation")]
+    [Header("Body turning")]
     [SerializeField] private Transform bodyRoot;
     [SerializeField] private float bodyYawGain = 260f;
     [SerializeField] private float bodyYawClamp = 70f;
 
-    [Header("Hand Mapping")]
-    [SerializeField, Tooltip("Use right-hand landmarks. Disable for left-hand control.")]
-    private bool useRightHand = true;
-    [SerializeField, Tooltip("Gain applied to thumb movement when driving the right shoulder weight.")]
-    private float thumbRaiseGain = 4f;
-    [SerializeField, Tooltip("Gain applied to ring-finger movement when driving the left shoulder weight.")]
-    private float shoulderCurlGain = 1.2f;
-    [SerializeField, Tooltip("Gain applied when mapping finger curl to elbow bend.")]
-    private float elbowCurlGain = 1.2f;
-    [SerializeField, Tooltip("Dead zone for finger movement before arms respond.")]
-    private float trioActivationThreshold = 0.02f;
-    [SerializeField, Tooltip("Blend between positional raise (0) and curl raise (1) for the ring finger.")]
-    private float trioShoulderBlend = 0.3f;
-    [SerializeField, Tooltip("Smoothing factor applied per frame.")]
-    private float smoothing = 12f;
+    [Header("Finger mapping knobs")]
+    [SerializeField] private bool useRightHand = true;
+    [SerializeField] private float thumbRaiseGain = 4f;
+    [SerializeField] private float trioRaiseGain = 1.2f;
+    [SerializeField] private float elbowCurlGain = 1.2f;
+    [SerializeField] private float trioDeadZone = 0.02f;
+    [SerializeField] private float trioBlend = 0.3f;
+    [SerializeField] private float smoothing = 12f;
 
-    private Vector3 _headRestPos;
-    private Quaternion _headRestRot;
-    private bool _headCaptured;
-    private Quaternion _bodyRestRot;
-    private bool _bodyCaptured;
+    private Vector3 headRestPos;
+    private Quaternion headRestRot;
+    private bool headHasRest;
+    private Quaternion bodyRestRot;
+    private bool bodyHasRest;
+    private Quaternion rightUpperRest;
+    private Quaternion rightForeRest;
+    private Quaternion leftUpperRest;
+    private Quaternion leftForeRest;
 
-    private Quaternion _rightUpperRestRot;
-    private Quaternion _rightForearmRestRot;
-    private Quaternion _leftUpperRestRot;
-    private Quaternion _leftForearmRestRot;
+    private float wantShoulderRight;
+    private float wantElbowRight;
+    private float wantShoulderLeft;
+    private float wantElbowLeft;
+    private float wantHeadYaw;
+    private float wantHeadPitch;
+    private float wantBodyYaw;
 
-    private float _targetShoulderRight;
-    private float _targetElbowRight;
-    private float _targetShoulderLeft;
-    private float _targetElbowLeft;
-    private float _targetHeadYaw;
-    private float _targetHeadPitch;
-    private float _targetBodyYaw;
+    private float currentShoulderRight;
+    private float currentElbowRight;
+    private float currentShoulderLeft;
+    private float currentElbowLeft;
+    private float currentHeadYaw;
+    private float currentHeadPitch;
+    private float currentBodyYaw;
 
-    private float _shoulderRight;
-    private float _elbowRight;
-    private float _shoulderLeft;
-    private float _elbowLeft;
-    private float _headYaw;
-    private float _headPitch;
-    private float _bodyYaw;
-
-    private Vector3 _indexRestDelta;
-    private bool _indexRestCaptured;
-    private float _palmYawRest;
-    private bool _palmRestCaptured;
+    private Vector3 indexRestDelta;
+    private bool indexRestCaptured;
+    private Vector3 palmRestNormal;
+    private bool palmRestCaptured;
 
     private void Awake()
     {
-      CaptureRestState();
+      CaptureRest();
     }
 
     private void OnEnable()
     {
       if (source != null)
       {
-        source.OnHandFrame += HandleHandFrame;
+        source.OnHandFrame += OnHandFrame;
       }
     }
 
@@ -138,440 +120,302 @@ namespace HandControl
     {
       if (source != null)
       {
-        source.OnHandFrame -= HandleHandFrame;
+        source.OnHandFrame -= OnHandFrame;
       }
-
-      ResetToRest();
+      ResetEverything();
     }
 
-    public void CaptureRestState()
+    private void Update()
+    {
+      var t = Mathf.Clamp01(Time.deltaTime * Mathf.Max(0f, smoothing));
+      currentShoulderRight = Mathf.Lerp(currentShoulderRight, wantShoulderRight, t);
+      currentElbowRight = Mathf.Lerp(currentElbowRight, wantElbowRight, t);
+      currentShoulderLeft = Mathf.Lerp(currentShoulderLeft, wantShoulderLeft, t);
+      currentElbowLeft = Mathf.Lerp(currentElbowLeft, wantElbowLeft, t);
+      currentHeadYaw = Mathf.Lerp(currentHeadYaw, wantHeadYaw, t);
+      currentHeadPitch = Mathf.Lerp(currentHeadPitch, wantHeadPitch, t);
+      currentBodyYaw = Mathf.Lerp(currentBodyYaw, wantBodyYaw, Mathf.Clamp01(Time.deltaTime * (smoothing * 0.5f)));
+
+      ApplyArm(rightArm, currentShoulderRight, currentElbowRight);
+      ApplyArm(leftArm, currentShoulderLeft, currentElbowLeft);
+      ApplyHead();
+      ApplyBody();
+      ApplyExtraBones();
+    }
+
+    private void OnHandFrame(HandTrackingSource.HandFrameData frame)
+    {
+      if (frame == null || frame.landmarks == null || frame.landmarks.Length < 21 || !frame.tracked)
+      {
+        SetTargetsWhenMissing();
+        return;
+      }
+
+      if (useRightHand && !frame.isRight || !useRightHand && frame.isRight)
+      {
+        SetTargetsWhenMissing();
+        return;
+      }
+
+      var points = frame.landmarks;
+      var wrist = points[0];
+
+      UpdateArm(rightArm, points, wrist, 1, 4, ref wantShoulderRight, ref wantElbowRight, thumbRaiseGain);
+      UpdateArm(leftArm, points, wrist, 13, 16, ref wantShoulderLeft, ref wantElbowLeft, trioRaiseGain, trioBlend);
+      UpdateHead(points);
+      UpdateBody(points, wrist);
+    }
+
+    private void UpdateArm(ArmStuff arm, Vector3[] pts, Vector3 wrist, int baseIdx, int tipIdx, ref float shoulder, ref float elbow, float raiseGain, float blend = 0.25f)
+    {
+      if (arm == null || !arm.hasRest)
+      {
+        return;
+      }
+
+      var basePos = pts[baseIdx];
+      var tipPos = pts[tipIdx];
+      var fingerDelta = tipPos - basePos;
+      var fingerTipOffset = tipPos - wrist;
+      var curlNow = ComputeFingerCurl(baseIdx, baseIdx + 1, baseIdx + 2, tipIdx, pts);
+
+      if (!arm.fingerRestCaptured)
+      {
+        arm.fingerRestDelta = fingerDelta;
+        arm.fingerTipRest = fingerTipOffset;
+        arm.fingerCurlRest = curlNow;
+        arm.fingerRestCaptured = true;
+      }
+
+      var deltaFromRest = fingerDelta - arm.fingerRestDelta;
+      var tipFromRest = fingerTipOffset - arm.fingerTipRest;
+      shoulder = Mathf.Clamp01(Mathf.Max(0f, tipFromRest.magnitude - trioDeadZone) * raiseGain);
+
+      var curlDelta = Mathf.Max(0f, arm.fingerCurlRest - curlNow);
+      elbow = Mathf.Clamp01(curlDelta * elbowCurlGain);
+
+      if (arm.target != null)
+      {
+        arm.targetOffset = Vector3.Scale(tipFromRest, arm.targetScale);
+      }
+
+      if (arm.hint != null)
+      {
+        arm.hintOffset = Vector3.Scale(deltaFromRest, arm.hintScale);
+      }
+
+      if (blend > 0f)
+      {
+        var extraRaise = Mathf.Clamp01((curlDelta - trioDeadZone) / Mathf.Max(0.0001f, 1f - trioDeadZone));
+        shoulder = Mathf.Clamp01(Mathf.Lerp(shoulder, extraRaise, Mathf.Clamp01(blend)));
+      }
+    }
+
+    private void UpdateHead(Vector3[] pts)
+    {
+      if (!headHasRest || headTarget == null)
+      {
+        return;
+      }
+
+      var indexBase = pts[5];
+      var indexTip = pts[8];
+      var offset = indexTip - indexBase;
+
+      if (!indexRestCaptured)
+      {
+        indexRestDelta = offset;
+        indexRestCaptured = true;
+      }
+
+      var fromRest = offset - indexRestDelta;
+      wantHeadYaw = Mathf.Clamp(fromRest.x * headGain, -headYawRange, headYawRange);
+      var pitchSignal = -fromRest.y;
+      wantHeadPitch = Mathf.Clamp(pitchSignal * headGain, -headPitchRange, headPitchRange);
+    }
+
+    private void UpdateBody(Vector3[] pts, Vector3 wrist)
+    {
+      if (!bodyHasRest || bodyRoot == null)
+      {
+        return;
+      }
+
+      var indexBase = pts[5];
+      var pinkyBase = pts[17];
+      var palmNormal = Vector3.Cross(indexBase - wrist, pinkyBase - wrist);
+
+      if (!palmRestCaptured)
+      {
+        palmRestNormal = palmNormal;
+        palmRestCaptured = true;
+      }
+
+      var rest = palmRestNormal.normalized;
+      var curr = palmNormal.normalized;
+      var angle = Vector3.SignedAngle(rest, curr, Vector3.forward);
+      wantBodyYaw = Mathf.Clamp(angle * bodyYawGain, -bodyYawClamp, bodyYawClamp);
+    }
+
+    private void CaptureRest()
     {
       CaptureArmRest(rightArm);
       CaptureArmRest(leftArm);
 
       if (headTarget != null)
       {
-        _headRestPos = headTarget.localPosition;
-        _headRestRot = headTarget.localRotation;
-        _headCaptured = true;
+        headRestPos = headTarget.localPosition;
+        headRestRot = headTarget.localRotation;
+        headHasRest = true;
       }
 
       if (bodyRoot != null)
       {
-        _bodyRestRot = bodyRoot.localRotation;
-        _bodyCaptured = true;
+        bodyRestRot = bodyRoot.localRotation;
+        bodyHasRest = true;
       }
 
-      if (rightUpperArmBone != null)
-      {
-        _rightUpperRestRot = rightUpperArmBone.localRotation;
-      }
-
-      if (rightForearmBone != null)
-      {
-        _rightForearmRestRot = rightForearmBone.localRotation;
-      }
-
-      if (leftUpperArmBone != null)
-      {
-        _leftUpperRestRot = leftUpperArmBone.localRotation;
-      }
-
-      if (leftForearmBone != null)
-      {
-        _leftForearmRestRot = leftForearmBone.localRotation;
-      }
+      if (rightUpperBone != null) rightUpperRest = rightUpperBone.localRotation;
+      if (rightForeBone != null) rightForeRest = rightForeBone.localRotation;
+      if (leftUpperBone != null) leftUpperRest = leftUpperBone.localRotation;
+      if (leftForeBone != null) leftForeRest = leftForeBone.localRotation;
     }
 
-    private void CaptureArmRest(ArmIkConfig arm)
+    private void CaptureArmRest(ArmStuff arm)
     {
       if (arm == null)
       {
         return;
       }
 
-      if (arm.target != null)
-      {
-        arm.targetRest = arm.target.localPosition;
-      }
+      if (arm.target != null) arm.targetRest = arm.target.localPosition;
+      if (arm.hint != null) arm.hintRest = arm.hint.localPosition;
 
-      if (arm.hint != null)
-      {
-        arm.hintRest = arm.hint.localPosition;
-      }
-
-      arm.dynamicTargetOffset = Vector3.zero;
-      arm.dynamicHintOffset = Vector3.zero;
+      arm.targetOffset = Vector3.zero;
+      arm.hintOffset = Vector3.zero;
       arm.fingerRestDelta = Vector3.zero;
-      arm.fingerTipRestRelative = Vector3.zero;
-      arm.fingerRestCaptured = false;
+      arm.fingerTipRest = Vector3.zero;
       arm.fingerCurlRest = 0f;
-      arm.restCaptured = arm.target != null;
+      arm.fingerRestCaptured = false;
+      arm.hasRest = arm.target != null;
     }
 
-    private void ResetToRest()
+    private void ResetEverything()
     {
       ResetArm(rightArm);
       ResetArm(leftArm);
 
-      if (_headCaptured && headTarget != null)
+      if (headHasRest && headTarget != null)
       {
-        headTarget.localPosition = _headRestPos;
-        headTarget.localRotation = _headRestRot;
+        headTarget.localPosition = headRestPos;
+        headTarget.localRotation = headRestRot;
       }
 
-      if (_bodyCaptured && bodyRoot != null)
+      if (bodyHasRest && bodyRoot != null)
       {
-        bodyRoot.localRotation = _bodyRestRot;
+        bodyRoot.localRotation = bodyRestRot;
       }
 
-      if (rightUpperArmBone != null)
-      {
-        rightUpperArmBone.localRotation = _rightUpperRestRot;
-      }
+      if (rightUpperBone) rightUpperBone.localRotation = rightUpperRest;
+      if (rightForeBone) rightForeBone.localRotation = rightForeRest;
+      if (leftUpperBone) leftUpperBone.localRotation = leftUpperRest;
+      if (leftForeBone) leftForeBone.localRotation = leftForeRest;
 
-      if (rightForearmBone != null)
-      {
-        rightForearmBone.localRotation = _rightForearmRestRot;
-      }
-
-      if (leftUpperArmBone != null)
-      {
-        leftUpperArmBone.localRotation = _leftUpperRestRot;
-      }
-
-      if (leftForearmBone != null)
-      {
-        leftForearmBone.localRotation = _leftForearmRestRot;
-      }
-
-      _targetShoulderRight = _targetElbowRight = 0f;
-      _targetShoulderLeft = _targetElbowLeft = 0f;
-      _targetHeadYaw = _targetHeadPitch = 0f;
-      _targetBodyYaw = 0f;
-      _indexRestCaptured = false;
-      _palmRestCaptured = false;
+      wantShoulderRight = wantElbowRight = 0f;
+      wantShoulderLeft = wantElbowLeft = 0f;
+      wantHeadYaw = wantHeadPitch = 0f;
+      wantBodyYaw = 0f;
+      indexRestCaptured = false;
+      palmRestCaptured = false;
     }
 
-    private void ResetArm(ArmIkConfig arm)
+    private void ResetArm(ArmStuff arm)
     {
-      if (arm == null || !arm.restCaptured)
+      if (arm == null || !arm.hasRest)
       {
         return;
       }
 
-      if (arm.target != null)
-      {
-        arm.target.localPosition = arm.targetRest;
-      }
+      if (arm.target != null) arm.target.localPosition = arm.targetRest;
+      if (arm.hint != null) arm.hint.localPosition = arm.hintRest;
+      if (arm.rig != null) arm.rig.weight = 0f;
 
-      if (arm.hint != null)
-      {
-        arm.hint.localPosition = arm.hintRest;
-      }
-
-      if (arm.constraint != null)
-      {
-        arm.constraint.weight = 0f;
-      }
-
-      arm.dynamicTargetOffset = Vector3.zero;
-      arm.dynamicHintOffset = Vector3.zero;
+      arm.targetOffset = Vector3.zero;
+      arm.hintOffset = Vector3.zero;
       arm.fingerRestCaptured = false;
       arm.fingerRestDelta = Vector3.zero;
-      arm.fingerTipRestRelative = Vector3.zero;
+      arm.fingerTipRest = Vector3.zero;
       arm.fingerCurlRest = 0f;
     }
 
-    private void Update()
+    private void SetTargetsWhenMissing()
     {
-      var lerp = Mathf.Clamp01(Time.deltaTime * Mathf.Max(0f, smoothing));
-      _shoulderRight = Mathf.Lerp(_shoulderRight, _targetShoulderRight, lerp);
-      _elbowRight = Mathf.Lerp(_elbowRight, _targetElbowRight, lerp);
-      _shoulderLeft = Mathf.Lerp(_shoulderLeft, _targetShoulderLeft, lerp);
-      _elbowLeft = Mathf.Lerp(_elbowLeft, _targetElbowLeft, lerp);
-      _headYaw = Mathf.Lerp(_headYaw, _targetHeadYaw, lerp);
-      _headPitch = Mathf.Lerp(_headPitch, _targetHeadPitch, lerp);
-      _bodyYaw = Mathf.Lerp(_bodyYaw, _targetBodyYaw, Mathf.Clamp01(Time.deltaTime * (smoothing * 0.5f)));
-
-      ApplyArm(rightArm, _shoulderRight, _elbowRight);
-      ApplyArm(leftArm, _shoulderLeft, _elbowLeft);
-      ApplyHead();
-      ApplyBody();
-      ApplyBoneRotations();
+      wantShoulderRight = 0f;
+      wantElbowRight = 0f;
+      wantShoulderLeft = 0f;
+      wantElbowLeft = 0f;
+      wantHeadYaw = 0f;
+      wantHeadPitch = 0f;
+      wantBodyYaw = 0f;
     }
 
-    private void HandleHandFrame(HandTrackingSource.HandFrameData frame)
+    private void ApplyArm(ArmStuff arm, float shoulderWeight, float elbowWeight)
     {
-      if (frame == null || frame.landmarks == null || frame.landmarks.Length < 21 || !frame.tracked)
-      {
-        SetTargetsForNoHand();
-        return;
-      }
-
-      if (useRightHand && !frame.isRight || !useRightHand && frame.isRight)
-      {
-        SetTargetsForNoHand();
-        return;
-      }
-
-      HandleTrackedHand(frame);
-    }
-
-    private void HandleTrackedHand(HandTrackingSource.HandFrameData frame)
-    {
-      var pts = frame.landmarks;
-      var wrist = pts[0];
-
-      UpdateRightArm(pts, wrist);
-      UpdateLeftArm(pts, wrist);
-      UpdateHead(pts);
-      UpdateBody(frame, pts, wrist);
-    }
-
-    private void UpdateRightArm(Vector3[] pts, Vector3 wrist)
-    {
-      if (!rightArm.restCaptured)
+      if (arm == null || !arm.hasRest)
       {
         return;
       }
 
-      var thumbBase = pts[1];
-      var thumbTip = pts[4];
-      var thumbDelta = thumbTip - thumbBase;
-      var thumbRelative = thumbTip - wrist;
-      var thumbCurlRaw = ComputeFingerCurl(1, 2, 3, 4, pts);
-
-      if (!rightArm.fingerRestCaptured)
+      var weight = Mathf.Clamp01(Mathf.Max(shoulderWeight, elbowWeight) * arm.weightScale);
+      if (arm.rig != null)
       {
-        rightArm.fingerRestDelta = thumbDelta;
-        rightArm.fingerTipRestRelative = thumbRelative;
-        rightArm.fingerRestCaptured = true;
-        rightArm.fingerCurlRest = thumbCurlRaw;
-      }
-
-      var thumbDeltaFromRest = thumbDelta - rightArm.fingerRestDelta;
-      var thumbRelativeFromRest = thumbRelative - rightArm.fingerTipRestRelative;
-
-      rightArm.dynamicTargetOffset = Vector3.zero;
-      rightArm.dynamicHintOffset = Vector3.zero;
-
-      var magnitude = Mathf.Max(0f, thumbRelativeFromRest.magnitude - trioActivationThreshold);
-      _targetShoulderRight = Mathf.Clamp01(magnitude * thumbRaiseGain);
-
-      var thumbCurlDelta = rightArm.fingerCurlRest - thumbCurlRaw;
-      thumbCurlDelta = Mathf.Max(0f, thumbCurlDelta);
-      _targetElbowRight = Mathf.Clamp01(thumbCurlDelta * elbowCurlGain);
-    }
-
-    private void UpdateLeftArm(Vector3[] pts, Vector3 wrist)
-    {
-      if (!leftArm.restCaptured)
-      {
-        return;
-      }
-
-      var ringBase = pts[13];
-      var ringTip = pts[16];
-      var ringDelta = ringTip - ringBase;
-      var ringRelative = ringTip - wrist;
-      var ringCurlRaw = ComputeFingerCurl(13, 14, 15, 16, pts);
-
-      if (!leftArm.fingerRestCaptured)
-      {
-        leftArm.fingerRestDelta = ringDelta;
-        leftArm.fingerTipRestRelative = ringRelative;
-        leftArm.fingerRestCaptured = true;
-        leftArm.fingerCurlRest = ringCurlRaw;
-      }
-
-      var ringDeltaFromRest = ringDelta - leftArm.fingerRestDelta;
-      var ringRelativeFromRest = ringRelative - leftArm.fingerTipRestRelative;
-
-      leftArm.dynamicTargetOffset = Vector3.zero;
-      leftArm.dynamicHintOffset = Vector3.zero;
-
-      var positionalRaise = Mathf.Max(0f, ringRelativeFromRest.magnitude - trioActivationThreshold);
-      positionalRaise = Mathf.Clamp01(positionalRaise * shoulderCurlGain);
-
-      var ringCurlDelta = leftArm.fingerCurlRest - ringCurlRaw;
-      ringCurlDelta = Mathf.Max(0f, ringCurlDelta);
-      var ringCurl = Mathf.Clamp01(ringCurlDelta);
-      var blendedRaise = Mathf.Lerp(positionalRaise, ringCurl, Mathf.Clamp01(trioShoulderBlend));
-      _targetShoulderLeft = blendedRaise;
-
-      _targetElbowLeft = Mathf.Clamp01(ringCurl * elbowCurlGain);
-    }
-
-    private void UpdateHead(Vector3[] pts)
-    {
-      if (!_headCaptured || headTarget == null)
-      {
-        return;
-      }
-
-      var indexMcp = pts[5];
-      var indexTip = pts[8];
-      var indexDelta = indexTip - indexMcp;
-
-      if (!_indexRestCaptured)
-      {
-        _indexRestDelta = indexDelta;
-        _indexRestCaptured = true;
-      }
-
-      var indexFromRest = indexDelta - _indexRestDelta;
-      var yaw = Mathf.Clamp(indexFromRest.x * headMotionGain, -headYawRange, headYawRange);
-      var pitchSignal = -indexFromRest.y;
-      var pitch = Mathf.Clamp(pitchSignal * headMotionGain, -headPitchRange, headPitchRange);
-
-      _targetHeadYaw = yaw;
-      _targetHeadPitch = pitch;
-    }
-
-    private void UpdateBody(HandTrackingSource.HandFrameData frame, Vector3[] pts, Vector3 wrist)
-    {
-      if (!_bodyCaptured || bodyRoot == null)
-      {
-        return;
-      }
-
-      var indexMcp = pts[5];
-      var pinkyBase = pts[17];
-      var palmCross = Vector3.Cross(indexMcp - wrist, pinkyBase - wrist);
-
-      if (!_palmRestCaptured)
-      {
-        _palmYawRest = palmCross.z;
-        _palmRestCaptured = true;
-      }
-
-      var yawFactor = frame.isRight ? 1f : -1f;
-      var yawSignal = (palmCross.z - _palmYawRest) * yawFactor;
-      var yawValue = Mathf.Clamp(yawSignal * bodyYawGain, -bodyYawClamp, bodyYawClamp);
-      _targetBodyYaw = yawValue;
-    }
-
-    private void SetTargetsForNoHand()
-    {
-      _targetShoulderRight = 0f;
-      _targetElbowRight = 0f;
-      _targetShoulderLeft = 0f;
-      _targetElbowLeft = 0f;
-      _targetHeadYaw = 0f;
-      _targetHeadPitch = 0f;
-      _targetBodyYaw = 0f;
-
-      rightArm.dynamicTargetOffset = Vector3.zero;
-      rightArm.dynamicHintOffset = Vector3.zero;
-      rightArm.fingerRestCaptured = false;
-      rightArm.fingerRestDelta = Vector3.zero;
-      rightArm.fingerTipRestRelative = Vector3.zero;
-      rightArm.fingerCurlRest = 0f;
-
-      leftArm.dynamicTargetOffset = Vector3.zero;
-      leftArm.dynamicHintOffset = Vector3.zero;
-      leftArm.fingerRestCaptured = false;
-      leftArm.fingerRestDelta = Vector3.zero;
-      leftArm.fingerTipRestRelative = Vector3.zero;
-      leftArm.fingerCurlRest = 0f;
-
-      _indexRestCaptured = false;
-      _palmRestCaptured = false;
-    }
-
-    private void ApplyArm(ArmIkConfig arm, float shoulderWeight, float elbowWeight)
-    {
-      if (arm == null || !arm.restCaptured)
-      {
-        return;
-      }
-
-      var activeWeight = Mathf.Clamp01(Mathf.Max(shoulderWeight, elbowWeight) * arm.weightMultiplier);
-      if (arm.constraint != null)
-      {
-        arm.constraint.weight = activeWeight;
+        arm.rig.weight = weight;
       }
 
       if (arm.target != null)
       {
-        var dir = arm.shoulderDirection.sqrMagnitude > 0f ? arm.shoulderDirection.normalized : Vector3.up;
-        var offset = arm.dynamicTargetOffset + dir * (arm.shoulderDistance * shoulderWeight);
+        var dir = arm.shoulderDir.sqrMagnitude > 0f ? arm.shoulderDir.normalized : Vector3.up;
+        var offset = arm.targetOffset + dir * (arm.shoulderDistance * shoulderWeight);
         arm.target.localPosition = arm.targetRest + offset;
       }
 
       if (arm.hint != null)
       {
-        var dirHint = arm.elbowDirection.sqrMagnitude > 0f ? arm.elbowDirection.normalized : Vector3.forward;
-        var offset = arm.dynamicHintOffset + dirHint * (arm.elbowDistance * elbowWeight);
+        var dir = arm.elbowDir.sqrMagnitude > 0f ? arm.elbowDir.normalized : Vector3.forward;
+        var offset = arm.hintOffset + dir * (arm.elbowDistance * elbowWeight);
         arm.hint.localPosition = arm.hintRest + offset;
       }
     }
 
     private void ApplyHead()
     {
-      if (!_headCaptured || headTarget == null)
+      if (!headHasRest || headTarget == null)
       {
         return;
       }
 
-      var yawOffset = headYawAxis.normalized * _headYaw;
-      var pitchOffset = headPitchAxis.normalized * _headPitch;
-      headTarget.localPosition = _headRestPos + yawOffset + pitchOffset;
-      headTarget.localRotation = _headRestRot;
+      var yawOffset = headYawAxis.normalized * currentHeadYaw;
+      var pitchOffset = headPitchAxis.normalized * currentHeadPitch;
+      headTarget.localPosition = headRestPos + yawOffset + pitchOffset;
+      headTarget.localRotation = headRestRot;
     }
 
     private void ApplyBody()
     {
-      if (!_bodyCaptured || bodyRoot == null)
+      if (!bodyHasRest || bodyRoot == null)
       {
         return;
       }
 
-      bodyRoot.localRotation = _bodyRestRot * Quaternion.Euler(0f, _bodyYaw, 0f);
+      bodyRoot.localRotation = bodyRestRot * Quaternion.Euler(0f, currentBodyYaw, 0f);
     }
 
-    private void ApplyBoneRotations()
+    private void ApplyExtraBones()
     {
-      if (rightUpperArmBone != null)
-      {
-        var axis = rightUpperArmAxis.sqrMagnitude > 0f ? rightUpperArmAxis.normalized : Vector3.right;
-        rightUpperArmBone.localRotation = _rightUpperRestRot * Quaternion.AngleAxis(_shoulderRight * rightUpperArmAngle, axis);
-      }
-
-      if (rightForearmBone != null)
-      {
-        var axis = rightForearmAxis.sqrMagnitude > 0f ? rightForearmAxis.normalized : Vector3.right;
-        rightForearmBone.localRotation = _rightForearmRestRot * Quaternion.AngleAxis(_elbowRight * rightForearmAngle, axis);
-      }
-
-      if (leftUpperArmBone != null)
-      {
-        var axis = leftUpperArmAxis.sqrMagnitude > 0f ? leftUpperArmAxis.normalized : Vector3.right;
-        leftUpperArmBone.localRotation = _leftUpperRestRot * Quaternion.AngleAxis(_shoulderLeft * leftUpperArmAngle, axis);
-      }
-
-      if (leftForearmBone != null)
-      {
-        var axis = leftForearmAxis.sqrMagnitude > 0f ? leftForearmAxis.normalized : Vector3.right;
-        leftForearmBone.localRotation = _leftForearmRestRot * Quaternion.AngleAxis(_elbowLeft * leftForearmAngle, axis);
-      }
-    }
-
-    private static Vector3 ClampPerAxis(Vector3 value, Vector3 multiplier, float maxMagnitude)
-    {
-      var scaled = new Vector3(
-        value.x * multiplier.x,
-        value.y * multiplier.y,
-        value.z * multiplier.z
-      );
-
-      if (scaled.sqrMagnitude > maxMagnitude * maxMagnitude)
-      {
-        scaled = scaled.normalized * maxMagnitude;
-      }
-
-      return scaled;
+      if (rightUpperBone) rightUpperBone.localRotation = rightUpperRest * Quaternion.AngleAxis(currentShoulderRight * rightUpperAngle, rightUpperAxis.normalized);
+      if (rightForeBone) rightForeBone.localRotation = rightForeRest * Quaternion.AngleAxis(currentElbowRight * rightForeAngle, rightForeAxis.normalized);
+      if (leftUpperBone) leftUpperBone.localRotation = leftUpperRest * Quaternion.AngleAxis(currentShoulderLeft * leftUpperAngle, leftUpperAxis.normalized);
+      if (leftForeBone) leftForeBone.localRotation = leftForeRest * Quaternion.AngleAxis(currentElbowLeft * leftForeAngle, leftForeAxis.normalized);
     }
 
     private static float ComputeFingerCurl(int mcp, int pip, int dip, int tip, Vector3[] pts)
