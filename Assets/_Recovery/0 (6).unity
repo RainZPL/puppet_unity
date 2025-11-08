@@ -1604,8 +1604,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModeSwitch
   SwitchButton: {fileID: 1618524212}
-  Logic: {fileID: 844792193}
-  pause: {fileID: 1114648933}
   a: 1
 --- !u!114 &149278805
 MonoBehaviour:
@@ -2609,7 +2607,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &314107228
 Transform:
   m_ObjectHideFlags: 0
@@ -7105,7 +7103,6 @@ MonoBehaviour:
   Win: 0
   Lost: 0
   FreeEnd: 0
-  PlayVideo: 0
   PlayerHP: 100
   EnemyHP: 100
 --- !u!114 &844792194
@@ -12489,7 +12486,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Continue
   PauseUI: {fileID: 1114648933}
-  GameLogic: {fileID: 844792193}
 --- !u!114 &1510965021
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12915,7 +12911,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1535108670
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15461,8 +15457,8 @@ MonoBehaviour:
     finger movements to bring each character to life\u2014conveying gestures, emotions,
     and storytelling through subtle hand control. As an essential carrier of Jinjiang
     intangible cultural heritage, glove puppetry embodies both artistry and regional
-    tradition. However, in recent years, this ancient craft has gradually faded from
-    the public eye, facing challenges in attracting younger generations. \n\nPuppetPulse
+    tradition.\n\nHowever, in recent years, this ancient craft has gradually faded
+    from the public eye, facing challenges in attracting younger generations. PuppetPulse
     aims to digitally show the hand gesture language and performance system of Jinjiang
     Glove Puppetry through interactive experiences. By transforming traditional performance
     into an engaging digital format. PupperPulse seeks to help audiences rediscover

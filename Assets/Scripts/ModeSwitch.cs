@@ -4,18 +4,21 @@ using UnityEngine.UI;
 
 public class ModeSwitch : MonoBehaviour
 {
-    public Button Button;
-    int a = 0;
+    public Button SwitchButton;
+    public GameLogic Logic;
+    public GameObject pause;
+    public int a = 1;
+
+    void OnSwitchButtonClicked() 
+    {
+        a= a + 1;
+    }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        Button.onClick.AddListener(OnButtonClicked);
-    }
-
-    public void OnButtonClicked() 
-    {
-        a = a + 1;
+        a= 1;
+        SwitchButton.onClick.AddListener( OnSwitchButtonClicked );
     }
 
     // Update is called once per frame
@@ -25,11 +28,18 @@ public class ModeSwitch : MonoBehaviour
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = false;
             gameObject.GetComponent<Animator>().enabled = true;
+            if (Logic.PlayVideo)
+            {
+                pause.SetActive(true);
+                Time.timeScale = 0f;
+            }
         }
         else
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = true;
             gameObject.GetComponent<Animator>().enabled = false;
+            pause.SetActive( false );
+            Time.timeScale = 1.0f;
         }
     }
 }
