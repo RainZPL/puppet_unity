@@ -28,17 +28,11 @@ public class ModeSwitch : MonoBehaviour
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = false;
             gameObject.GetComponent<Animator>().enabled = true;
-            if (Logic.PlayVideo)
-            {
-                pause.SetActive(true);
-                Time.timeScale = 0f;
-            }
         }
         else
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = true;
             gameObject.GetComponent<Animator>().enabled = false;
-            pause.SetActive( false );
             Time.timeScale = 1.0f;
         }
     }

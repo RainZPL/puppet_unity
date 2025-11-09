@@ -11,6 +11,7 @@ public class UIControl : MonoBehaviour
     public GameObject Archive;
     public GameObject WinPannel;
     public GameObject LostPannel;
+    public GameObject DrawPannel;
     public GameObject MonkeyKing;
     public GameObject RedBoy;
 
@@ -42,6 +43,7 @@ public class UIControl : MonoBehaviour
         Archive.SetActive(false);
         WinPannel.SetActive(false);
         LostPannel.SetActive(false);
+        DrawPannel.SetActive(false);
         InGameUI.SetActive(false);
         PauseUI.SetActive(false);
         HPbar.SetActive(false);
@@ -55,7 +57,7 @@ public class UIControl : MonoBehaviour
 
     public void OnStartButtonClicked() 
     {
-        Debug.Log("hello");
+        //Debug.Log("hello");
         MainCamera.enabled = true;
         MenuCamera.enabled = false;
         Archive.SetActive(false);
@@ -92,9 +94,10 @@ public class UIControl : MonoBehaviour
             {
                 HPbar.SetActive(true);
                 CountDown.GetComponent<TextMeshProUGUI>().text = "Attack Time" + " " + GestureValidation.DeltaTime.ToString();
-                if (GestureValidation.isTimeout) 
+                if (GameLogic.PlayVideo) 
                 {
                     PauseUI.SetActive(true);
+                    GameLogic.Timer = 3;
                 }
             }
             else
@@ -111,6 +114,11 @@ public class UIControl : MonoBehaviour
             {
                 Time.timeScale = 0;
                 LostPannel.SetActive(true);
+            }
+            if (GameLogic.Draw) 
+            {
+                Time.timeScale = 0;
+                DrawPannel.SetActive(true);
             }
         }
     }

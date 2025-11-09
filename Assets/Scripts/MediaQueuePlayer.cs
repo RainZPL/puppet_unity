@@ -249,19 +249,7 @@ public class MediaQueuePlayer : MonoBehaviour
 
     private void StopCurrentPlayback()
     {
-        shouldLoopCurrentVideo = false; // Í£Ö¹Ñ­»·
 
-        if (videoPlayCoroutine != null)
-        {
-            StopCoroutine(videoPlayCoroutine);
-            videoPlayCoroutine = null;
-        }
-
-        if (externalVideoPlayer.isPlaying || externalVideoPlayer.isPrepared)
-        {
-            externalVideoPlayer.Stop();
-            OnPlaybackEnded?.Invoke(currentIndex);
-        }
     }
 
     public bool PlayMediaByIndex(object indexInput)
