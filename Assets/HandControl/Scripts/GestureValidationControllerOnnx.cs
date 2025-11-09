@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Unity.InferenceEngine;
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro; // 添加TextMeshPro命名空间
 using TensorFloat = Unity.InferenceEngine.Tensor<float>;
 
 namespace HandControl
@@ -17,8 +17,8 @@ namespace HandControl
         }
 
         public HandTrackingSource handSource;
-        public Text progressLabel;
-        public Text resultLabel;
+        public TextMeshProUGUI progressLabel; // 改为TextMeshProUGUI
+        public TextMeshProUGUI resultLabel;    // 改为TextMeshProUGUI
         public List<GestureInfo> gestures = new List<GestureInfo>();
         public ModelAsset modelAsset;
         public TextAsset labelMapJson;

@@ -11,6 +11,8 @@ public class UIControl : MonoBehaviour
     public GameObject Archive;
     public GameObject WinPannel;
     public GameObject LostPannel;
+    public GameObject MonkeyKing;
+    public GameObject RedBoy;
 
     public Camera MainCamera;
     public Camera MenuCamera;
@@ -21,6 +23,7 @@ public class UIControl : MonoBehaviour
     public GameObject CountDown;
     public GameObject InGameUI;
     public GameObject PauseUI;
+    public GameObject HPbar;
 
     public GameLogic GameLogic;
     public GestureValidationControllerOnnx GestureValidation;
@@ -41,6 +44,7 @@ public class UIControl : MonoBehaviour
         LostPannel.SetActive(false);
         InGameUI.SetActive(false);
         PauseUI.SetActive(false);
+        HPbar.SetActive(false);
 
         StartButton.onClick.AddListener(OnStartButtonClicked);
         EndButton.onClick.AddListener(OnEndButtonClicked);
@@ -51,12 +55,15 @@ public class UIControl : MonoBehaviour
 
     public void OnStartButtonClicked() 
     {
+        Debug.Log("hello");
         MainCamera.enabled = true;
         MenuCamera.enabled = false;
         Archive.SetActive(false);
         HandArea.SetActive(true);
         Menu.SetActive(false);
         BegginPlay = true;
+        MonkeyKing.transform.position = new Vector3(44.91f, 6.53f, 22.68f);
+        RedBoy.transform.position = new Vector3(38.86f, 6.58f, 23.85f);
     }
 
     public void OnEndButtonClicked()
@@ -83,6 +90,7 @@ public class UIControl : MonoBehaviour
             InGameUI.SetActive(true);
             if (GameLogic.FreeEnd)
             {
+                HPbar.SetActive(true);
                 CountDown.GetComponent<TextMeshProUGUI>().text = "Attack Time" + " " + GestureValidation.DeltaTime.ToString();
                 if (GestureValidation.isTimeout) 
                 {

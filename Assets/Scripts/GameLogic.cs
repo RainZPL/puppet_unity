@@ -19,12 +19,15 @@ public class GameLogic : MonoBehaviour
     public bool PlayVideo;
 
     float Damage = 20;
-    public float PlayerHP = 100;
-    public float EnemyHP = 100;    
+    public float PlayerHP = 80;
+    public float EnemyHP = 80;
+    float Timer = 3;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        MonkeyKing.transform.position = new Vector3(46.3f, 13.2f, 36.9f);
+        RedBoy.transform.position = new Vector3(41.6f, 13.1f, 36.8f);
         MKAnim = MonkeyKing.GetComponent<Animator>();
         RBAnim = RedBoy.GetComponent<Animator>();
         FreeEnd = false;
@@ -39,6 +42,12 @@ public class GameLogic : MonoBehaviour
         {
             if (ModeSwitch.a % 2 == 0)
             {
+                if (Input.GetKeyDown(KeyCode.P))
+                {
+                    PlayVideo = true;
+                    Time.timeScale = 0;
+                }
+
                 FreeEnd = true;
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = true;
 
@@ -46,11 +55,13 @@ public class GameLogic : MonoBehaviour
                 {
                     PlayerHP = PlayerHP - Damage;
                     RBAnim.SetTrigger("Attack");
+
+                        PlayVideo = true;
+
                     if (PlayerHP <= 0)
                     {
                         Win = false;
                         Lost = true;
-                        PlayVideo = true;
                     }
                     Time.timeScale = 0;
                     //Debug.Log("timeover");
@@ -59,13 +70,15 @@ public class GameLogic : MonoBehaviour
                 {
                     if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().gesturePassed)
                     {
-                        EnemyHP = PlayerHP - Damage;
+                        EnemyHP = EnemyHP - Damage; // 修复：应该是EnemyHP而不是PlayerHP
                         MKAnim.SetTrigger("fist");
-                        if (PlayerHP <= 0)
+
+                            PlayVideo = true;
+
+                        if (EnemyHP <= 0) // 修复：应该是检查EnemyHP而不是PlayerHP
                         {
                             Win = true;
                             Lost = false;
-                            PlayVideo = true;
                         }
                         //Debug.Log("welldone");
                     }
@@ -77,7 +90,7 @@ public class GameLogic : MonoBehaviour
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
             }
         }
-        else 
+        else
         {
             GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
         }
