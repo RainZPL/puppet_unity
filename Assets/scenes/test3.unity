@@ -12593,6 +12593,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skip
   PauseUI: {fileID: 1114648933}
   GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 1949448578}
   GestureValidationControllerOnnx: {fileID: 385042064}
 --- !u!114 &1354673453
 MonoBehaviour:
@@ -19358,6 +19359,7 @@ MonoBehaviour:
   GameLogic: {fileID: 844792193}
   GestureValidation: {fileID: 385042064}
   BegginPlay: 0
+  skiptimer: 0.1
 --- !u!224 &1949448579
 RectTransform:
   m_ObjectHideFlags: 0
