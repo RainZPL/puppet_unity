@@ -1,9 +1,11 @@
+using HandControl;
 using UnityEngine;
 
 public class Continue : MonoBehaviour
 {
     public GameObject PauseUI;
     public GameLogic GameLogic;
+    public GestureValidationControllerOnnx GestureValidationControllerOnnx;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public void OnButtonClick()
     {

@@ -1,6 +1,5 @@
 using HandControl;
 using UnityEngine;
-using TMPro;
 
 public class GameLogic : MonoBehaviour
 {
@@ -11,10 +10,6 @@ public class GameLogic : MonoBehaviour
     Animator RBAnim;
 
     public GameObject GestureValidation;
-
-    public TMP_Text tMP_Text1;
-    
-    public TMP_Text tMP_Text2;
     public ModeSwitch ModeSwitch;
     public UIControl UIControl;
     public bool Win;
@@ -51,9 +46,6 @@ public class GameLogic : MonoBehaviour
         {
             if (ModeSwitch.a % 2 == 0)
             {
-                tMP_Text1.enabled = true;
-                tMP_Text2.enabled = true;
-
                 if (Input.GetKeyDown(KeyCode.P))
                 {
                     PlayVideo = true;
@@ -141,9 +133,6 @@ public class GameLogic : MonoBehaviour
             {
                 //Debug.Log("free");
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
-                tMP_Text1.enabled = false;
-                tMP_Text2.enabled = false;
-                
             }
         }
         else

@@ -1,13 +1,13 @@
 using HandControl;
 using UnityEngine;
 using UnityEngine.UI;
+
 public class ModeSwitch : MonoBehaviour
 {
     public Button SwitchButton;
     public GameLogic Logic;
     public GameObject pause;
     public int a = 1;
-
 
     void OnSwitchButtonClicked() 
     {
@@ -27,13 +27,12 @@ public class ModeSwitch : MonoBehaviour
         if (a % 2 == 0)
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = false;
-
-            
+            gameObject.GetComponent<Animator>().enabled = true;
         }
         else
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = true;
-
+            gameObject.GetComponent<Animator>().enabled = false;
             Time.timeScale = 1.0f;
         }
     }

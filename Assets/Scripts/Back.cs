@@ -9,5 +9,6 @@ public class Back : MonoBehaviour
     {
         detailPannel.SetActive(false);
         frontPannel.SetActive(true);
+        Time.timeScale = 1.0f;
     }
 }
