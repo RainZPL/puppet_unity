@@ -10,14 +10,14 @@ namespace HandControl
         public class Item
         {
             public string gestureName;
-            public string triggerParameter; // 改为trigger参数名
+            public string boolParameter;
         }
 
         public GestureValidationControllerOnnx controller;
         public Animator targetAnimator;
         public List<Item> mapping = new List<Item>();
 
-        private readonly List<string> activeTriggers = new List<string>();
+        private readonly List<string> activeParams = new List<string>();
 
         private void OnEnable()
         {
@@ -25,8 +25,8 @@ namespace HandControl
             {
                 controller.OnGestureMatched += OnGestureHit;
                 controller.OnNewSessionStarted += OnNewSession;
-                controller.OnGestureResult += OnGestureResult;
-                controller.OnAllGesturesCompleted += OnAllGesturesCompleted;
+                controller.OnGestureResult += OnGestureResult; // 新增：监听所有手势结果
+                controller.OnAllGesturesCompleted += OnAllGesturesCompleted; // 新增：监听完成事件
             }
         }
 
@@ -43,7 +43,7 @@ namespace HandControl
 
         private void OnNewSession()
         {
-            ClearAllTriggers();
+            ClearAllParameters();
             Debug.Log("New gesture session started");
         }
 
@@ -66,24 +66,25 @@ namespace HandControl
 
                 if (string.Equals(item.gestureName, label, System.StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!string.IsNullOrEmpty(item.triggerParameter))
+                    if (!string.IsNullOrEmpty(item.boolParameter))
                     {
-                        // 触发对应的trigger
-                        targetAnimator.SetTrigger(item.triggerParameter);
+                        // 先清除所有参数，然后设置当前参数
+                        ClearAllParameters();
+                        targetAnimator.SetBool(item.boolParameter, true);
 
-                        if (!activeTriggers.Contains(item.triggerParameter))
+                        if (!activeParams.Contains(item.boolParameter))
                         {
-                            activeTriggers.Add(item.triggerParameter);
+                            activeParams.Add(item.boolParameter);
                         }
 
-                        Debug.Log($"Set animator trigger: {item.triggerParameter}");
+                        Debug.Log($"Set animator parameter: {item.boolParameter} = true");
                     }
                     break;
                 }
             }
         }
 
-        // 处理每个手势的结果
+        // 新增：处理每个手势的结果
         private void OnGestureResult(int index, bool success, string label)
         {
             Debug.Log($"Gesture result: {label} - {(success ? "SUCCESS" : "FAILED/TIMEOUT")}");
@@ -97,36 +98,32 @@ namespace HandControl
                 // 失败或超时的手势可以在这里处理
                 // 例如：播放失败动画、显示提示等
                 Debug.Log($"Gesture failed or timeout: {label}");
-
-                // 可以触发一个失败动画的trigger
-                // targetAnimator.SetTrigger("GestureFailed");
             }
         }
 
-        // 所有手势完成时的处理
+        // 新增：所有手势完成时的处理
         private void OnAllGesturesCompleted()
         {
             Debug.Log("All gestures completed!");
 
             // 可以在这里添加完成后的逻辑
             // 例如：播放完成动画、显示结果等
-            // targetAnimator.SetTrigger("AllGesturesCompleted");
+
+            // 可选：清除所有动画参数
+            // ClearAllParameters();
         }
 
-        // 清除所有trigger（如果需要）
-        private void ClearAllTriggers()
+        // 清除所有动画参数
+        private void ClearAllParameters()
         {
             if (targetAnimator == null) return;
 
-            // 注意：Trigger不需要手动清除，它们会自动重置
-            // 这个方法主要用于记录哪些trigger被触发过
-            activeTriggers.Clear();
-
-            // 如果需要重置所有trigger状态，可以调用ResetTrigger
-            foreach (var trigger in activeTriggers)
+            for (int i = 0; i < activeParams.Count; i++)
             {
-                targetAnimator.ResetTrigger(trigger);
+                targetAnimator.SetBool(activeParams[i], false);
             }
+
+            activeParams.Clear();
         }
 
         // 公共方法：手动触发手势动画
@@ -135,25 +132,10 @@ namespace HandControl
             OnGestureHit(gestureName);
         }
 
-        // 公共方法：重置特定trigger
-        public void ResetTrigger(string triggerName)
+        // 公共方法：清除动画状态
+        public void ResetAnimator()
         {
-            if (targetAnimator != null)
-            {
-                targetAnimator.ResetTrigger(triggerName);
-            }
-        }
-
-        // 公共方法：重置所有trigger
-        public void ResetAllTriggers()
-        {
-            if (targetAnimator == null) return;
-
-            foreach (var trigger in activeTriggers)
-            {
-                targetAnimator.ResetTrigger(trigger);
-            }
-            activeTriggers.Clear();
+            ClearAllParameters();
         }
 
         // 公共方法：检查手势是否在映射中

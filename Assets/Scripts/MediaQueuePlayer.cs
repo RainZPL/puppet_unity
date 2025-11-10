@@ -1,15 +1,12 @@
 using UnityEngine;
 using UnityEngine.Video;
 using TMPro;
-using UnityEngine.UI;
-using System.Collections;
 using System.Collections.Generic;
 using HandControl;
 
 public class MediaQueuePlayer : MonoBehaviour
 {
     public GestureValidationControllerOnnx gestureValidation;
-
     [System.Serializable]
     public class MediaItem
     {
@@ -21,22 +18,17 @@ public class MediaQueuePlayer : MonoBehaviour
     [Header("外部组件引用")]
     [SerializeField] private VideoPlayer externalVideoPlayer;
     [SerializeField] private TextMeshProUGUI externalTextDisplay;
-    [SerializeField] private RawImage videoDisplayRawImage;
-    [SerializeField] private RenderTexture renderTexture;
 
     [Header("媒体队列")]
     [SerializeField] private List<MediaItem> mediaQueue = new List<MediaItem>();
 
     [Header("播放设置")]
     [SerializeField] private bool autoPlay = true;
+    [SerializeField] private bool loopVideo = false;
     [SerializeField] private bool validateOnStart = true;
-    [SerializeField] private bool useRenderTextureApproach = true;
 
-    private int currentIndex = -1;
+    private int currentIndex = 0;
     private bool isInitialized = false;
-    private Coroutine videoPlayCoroutine;
-    private int targetIndex = -1;
-    private bool shouldLoopCurrentVideo = true; // 控制是否循环当前视频
 
     // 事件
     public System.Action<int> OnMediaChanged;
@@ -49,25 +41,7 @@ public class MediaQueuePlayer : MonoBehaviour
         if (validateOnStart)
         {
             Initialize();
-            if (gestureValidation != null)
-            {
-                targetIndex = gestureValidation.currentGestureIndex;
-                PlayMedia(targetIndex);
-            }
-        }
-    }
-
-    void Update()
-    {
-        // 监听外部index变化
-        if (gestureValidation != null && gestureValidation.currentGestureIndex != targetIndex)
-        {
-            if (gestureValidation.currentGestureIndex < 5) 
-            {
-                targetIndex = gestureValidation.currentGestureIndex;
-            }
-
-            PlayMedia(targetIndex);
+            currentIndex = gestureValidation.currentGestureIndex;
         }
     }
 
@@ -75,6 +49,7 @@ public class MediaQueuePlayer : MonoBehaviour
     {
         if (isInitialized) return;
 
+        // 验证必要组件
         if (externalVideoPlayer == null)
         {
             LogError("未分配外部VideoPlayer引用！");
@@ -87,24 +62,42 @@ public class MediaQueuePlayer : MonoBehaviour
             return;
         }
 
+        // 配置Video Player
         SetupVideoPlayer();
+
         isInitialized = true;
+
+        if (autoPlay && mediaQueue.Count > 0)
+        {
+            PlayMedia(0);
+        }
     }
 
     private void SetupVideoPlayer()
     {
-        externalVideoPlayer.playOnAwake = false;
+        externalVideoPlayer.playOnAwake = true;
+        externalVideoPlayer.isLooping = loopVideo;
 
-        if (useRenderTextureApproach && renderTexture != null && videoDisplayRawImage != null)
-        {
-            externalVideoPlayer.renderMode = VideoRenderMode.RenderTexture;
-            externalVideoPlayer.targetTexture = renderTexture;
-            videoDisplayRawImage.texture = renderTexture;
-            externalVideoPlayer.audioOutputMode = VideoAudioOutputMode.None;
-        }
-
+        // 注册事件
+        externalVideoPlayer.started += OnVideoStarted;
+        externalVideoPlayer.loopPointReached += OnVideoEnded;
         externalVideoPlayer.errorReceived += OnVideoError;
-        externalVideoPlayer.loopPointReached += OnVideoLoopPointReached;
+    }
+
+    #region 视频事件处理
+    private void OnVideoStarted(VideoPlayer source)
+    {
+        OnPlaybackStarted?.Invoke(currentIndex);
+    }
+
+    private void OnVideoEnded(VideoPlayer source)
+    {
+        OnPlaybackEnded?.Invoke(currentIndex);
+
+        if (!loopVideo && autoPlay)
+        {
+            PlayNext();
+        }
     }
 
     private void OnVideoError(VideoPlayer source, string message)
@@ -112,18 +105,7 @@ public class MediaQueuePlayer : MonoBehaviour
         LogError($"视频播放错误: {message}");
         OnErrorOccurred?.Invoke(message);
     }
-
-    private void OnVideoLoopPointReached(VideoPlayer source)
-    {
-        // 视频播放完成，检查是否需要循环
-        if (shouldLoopCurrentVideo && externalVideoPlayer.isPlaying)
-        {
-            // 重新开始播放当前视频
-            externalVideoPlayer.frame = 0;
-            externalVideoPlayer.Play();
-            Debug.Log("视频循环播放");
-        }
-    }
+    #endregion
 
     #region 主要播放控制方法
     public bool PlayMedia(int index)
@@ -136,120 +118,28 @@ public class MediaQueuePlayer : MonoBehaviour
             return false;
         }
 
-        // 如果索引没有变化，且正在播放，则继续循环当前视频
-        if (index == currentIndex && externalVideoPlayer.isPlaying)
-        {
-            Debug.Log($"索引未变化，继续播放当前视频: {index}");
-            return true;
-        }
-
-        // 停止当前播放
-        StopCurrentPlayback();
-
         currentIndex = index;
-        targetIndex = index;
         MediaItem currentItem = mediaQueue[currentIndex];
 
-        if (currentItem.videoClip == null)
+        // 停止当前播放
+        externalVideoPlayer.Stop();
+
+        // 设置并播放视频
+        if (currentItem.videoClip != null)
+        {
+            externalVideoPlayer.clip = currentItem.videoClip;
+            externalVideoPlayer.Play();
+        }
+        else
         {
             LogError($"索引 {index} 的视频剪辑为空");
-            return false;
         }
 
         // 设置文本
         externalTextDisplay.text = currentItem.displayText ?? string.Empty;
 
-        // 开始播放
-        if (useRenderTextureApproach)
-        {
-            return PlayMediaWithCoroutine(currentItem.videoClip);
-        }
-        else
-        {
-            return PlayMediaStandard(currentItem.videoClip);
-        }
-    }
-
-    private bool PlayMediaStandard(VideoClip clip)
-    {
-        externalVideoPlayer.clip = clip;
-        externalVideoPlayer.isLooping = true; // 启用VideoPlayer内置循环
-        externalVideoPlayer.Play();
-
         OnMediaChanged?.Invoke(currentIndex);
-        OnPlaybackStarted?.Invoke(currentIndex);
-
-        Debug.Log($"开始播放视频: {clip.name}, 启用循环");
         return true;
-    }
-
-    private bool PlayMediaWithCoroutine(VideoClip clip)
-    {
-        if (videoPlayCoroutine != null)
-            StopCoroutine(videoPlayCoroutine);
-
-        videoPlayCoroutine = StartCoroutine(PlayVideoCoroutine(clip));
-        return true;
-    }
-
-    private IEnumerator PlayVideoCoroutine(VideoClip clip)
-    {
-        externalVideoPlayer.clip = clip;
-        externalVideoPlayer.isLooping = false; // 禁用内置循环，由我们控制
-        externalVideoPlayer.Prepare();
-
-        // 等待视频准备完成
-        while (!externalVideoPlayer.isPrepared)
-        {
-            yield return null;
-        }
-
-        externalVideoPlayer.Play();
-        OnMediaChanged?.Invoke(currentIndex);
-        OnPlaybackStarted?.Invoke(currentIndex);
-
-        Debug.Log($"开始播放视频: {clip.name}, 使用协程控制循环");
-
-        int currentPlayIndex = currentIndex; // 保存当前播放索引
-        shouldLoopCurrentVideo = true; // 允许循环
-
-        while (shouldLoopCurrentVideo)
-        {
-            // 检查外部索引是否变化
-            if (gestureValidation != null && gestureValidation.currentGestureIndex != currentPlayIndex)
-            {
-                Debug.Log($"检测到索引变化，停止循环: {currentPlayIndex} -> {gestureValidation.currentGestureIndex}");
-                break;
-            }
-
-            // 检查是否播放完成
-            if (externalVideoPlayer.isPlaying &&
-                externalVideoPlayer.frame > 0 &&
-                externalVideoPlayer.frame >= (long)externalVideoPlayer.frameCount - 5)
-            {
-                Debug.Log("视频播放完成，重新开始循环");
-                // 重新开始播放
-                externalVideoPlayer.frame = 0;
-                externalVideoPlayer.Play();
-
-                // 短暂延迟，避免频繁检测
-                yield return new WaitForSeconds(0.1f);
-            }
-
-            yield return null;
-        }
-
-        // 如果是因为索引变化而退出，播放新视频
-        if (gestureValidation != null && gestureValidation.currentGestureIndex != currentPlayIndex)
-        {
-            Debug.Log($"切换到新视频: {gestureValidation.currentGestureIndex}");
-            PlayMedia(gestureValidation.currentGestureIndex);
-        }
-    }
-
-    private void StopCurrentPlayback()
-    {
-
     }
 
     public bool PlayMediaByIndex(object indexInput)
@@ -274,21 +164,40 @@ public class MediaQueuePlayer : MonoBehaviour
 
         return PlayMedia(index);
     }
+    #endregion
 
-    public void SetTargetIndex(int newIndex)
+    #region 便捷播放方法
+    public bool PlayNext()
     {
-        targetIndex = newIndex;
-        PlayMedia(targetIndex);
+        if (mediaQueue.Count == 0) return false;
+        int nextIndex = (currentIndex + 1) % mediaQueue.Count;
+        return PlayMedia(nextIndex);
+    }
+
+    public bool PlayPrevious()
+    {
+        if (mediaQueue.Count == 0) return false;
+        int prevIndex = (currentIndex - 1 + mediaQueue.Count) % mediaQueue.Count;
+        return PlayMedia(prevIndex);
+    }
+
+    public bool PlayFirst()
+    {
+        return mediaQueue.Count > 0 && PlayMedia(0);
+    }
+
+    public bool PlayLast()
+    {
+        return mediaQueue.Count > 0 && PlayMedia(mediaQueue.Count - 1);
     }
     #endregion
 
     #region 播放控制方法
     public void Play()
     {
-        if (ValidateComponents() && !externalVideoPlayer.isPlaying && currentIndex >= 0)
+        if (ValidateComponents() && !externalVideoPlayer.isPlaying)
         {
             externalVideoPlayer.Play();
-            shouldLoopCurrentVideo = true;
         }
     }
 
@@ -302,9 +211,10 @@ public class MediaQueuePlayer : MonoBehaviour
 
     public void Stop()
     {
-        StopCurrentPlayback();
-        currentIndex = -1;
-        targetIndex = -1;
+        if (ValidateComponents())
+        {
+            externalVideoPlayer.Stop();
+        }
     }
 
     public void TogglePlayPause()
@@ -312,25 +222,55 @@ public class MediaQueuePlayer : MonoBehaviour
         if (!ValidateComponents()) return;
 
         if (externalVideoPlayer.isPlaying)
-        {
             externalVideoPlayer.Pause();
-            shouldLoopCurrentVideo = false;
+        else
+            externalVideoPlayer.Play();
+    }
+
+    public void SetLooping(bool looping)
+    {
+        if (ValidateComponents())
+        {
+            externalVideoPlayer.isLooping = looping;
+        }
+    }
+    #endregion
+
+    #region 队列管理方法
+    public void AddMediaItem(VideoClip videoClip, string text, int insertIndex = -1)
+    {
+        var newItem = new MediaItem { videoClip = videoClip, displayText = text };
+
+        if (insertIndex >= 0 && insertIndex < mediaQueue.Count)
+        {
+            mediaQueue.Insert(insertIndex, newItem);
         }
         else
         {
-            externalVideoPlayer.Play();
-            shouldLoopCurrentVideo = true;
+            mediaQueue.Add(newItem);
         }
     }
 
-    // 设置是否循环当前视频
-    public void SetLoopCurrentVideo(bool loop)
+    public bool RemoveMediaItem(int index)
     {
-        shouldLoopCurrentVideo = loop;
-        if (externalVideoPlayer != null)
+        if (index < 0 || index >= mediaQueue.Count) return false;
+
+        mediaQueue.RemoveAt(index);
+
+        // 调整当前索引
+        if (currentIndex >= index)
         {
-            externalVideoPlayer.isLooping = loop && !useRenderTextureApproach;
+            currentIndex = Mathf.Max(0, currentIndex - 1);
         }
+
+        return true;
+    }
+
+    public void ClearQueue()
+    {
+        mediaQueue.Clear();
+        Stop();
+        currentIndex = -1;
     }
     #endregion
 
@@ -349,12 +289,6 @@ public class MediaQueuePlayer : MonoBehaviour
             return false;
         }
 
-        if (useRenderTextureApproach && (renderTexture == null || videoDisplayRawImage == null))
-        {
-            LogError("RenderTexture方案需要RenderTexture和RawImage引用");
-            return false;
-        }
-
         return true;
     }
 
@@ -366,9 +300,7 @@ public class MediaQueuePlayer : MonoBehaviour
     public bool IsValid => ValidateComponents() && isInitialized;
     public bool IsPlaying => ValidateComponents() && externalVideoPlayer.isPlaying;
     public int CurrentIndex => currentIndex;
-    public int TargetIndex => targetIndex;
     public int QueueCount => mediaQueue.Count;
-    public bool IsLooping => shouldLoopCurrentVideo;
     public MediaItem CurrentMediaItem =>
         (currentIndex >= 0 && currentIndex < mediaQueue.Count) ? mediaQueue[currentIndex] : null;
 
@@ -377,24 +309,35 @@ public class MediaQueuePlayer : MonoBehaviour
         if (!ValidateComponents()) return "组件未初始化";
 
         return $"播放状态: {(IsPlaying ? "播放中" : "停止")}, " +
-               $"当前索引: {currentIndex}, " +
-               $"目标索引: {targetIndex}, " +
-               $"循环: {shouldLoopCurrentVideo}, " +
-               $"帧: {externalVideoPlayer.frame}/{externalVideoPlayer.frameCount}";
+               $"当前索引: {currentIndex}/{mediaQueue.Count}, " +
+               $"循环: {externalVideoPlayer.isLooping}";
     }
     #endregion
 
     void OnDestroy()
     {
+        // 清理事件注册
         if (externalVideoPlayer != null)
         {
+            externalVideoPlayer.started -= OnVideoStarted;
+            externalVideoPlayer.loopPointReached -= OnVideoEnded;
             externalVideoPlayer.errorReceived -= OnVideoError;
-            externalVideoPlayer.loopPointReached -= OnVideoLoopPointReached;
-        }
-
-        if (videoPlayCoroutine != null)
-        {
-            StopCoroutine(videoPlayCoroutine);
         }
     }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        // 编辑器验证
+        if (externalVideoPlayer == null)
+        {
+            Debug.LogWarning("请分配外部VideoPlayer引用", this);
+        }
+
+        if (externalTextDisplay == null)
+        {
+            Debug.LogWarning("请分配外部TextMeshPro引用", this);
+        }
+    }
+#endif
 }
