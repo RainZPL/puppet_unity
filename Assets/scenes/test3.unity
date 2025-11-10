@@ -1394,6 +1394,16 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
   m_PrefabInstance: {fileID: 96095475}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &96095477 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -2525213446790289079, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
+  m_PrefabInstance: {fileID: 96095475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &96095478 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -2444406315379408139, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
+  m_PrefabInstance: {fileID: 96095475}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &101324561
 GameObject:
   m_ObjectHideFlags: 0
@@ -1830,7 +1840,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: 0, z: 0, w: 17.849396}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -2297,36 +2307,36 @@ MonoBehaviour:
   useRightHand: 1
   rightUpper: {fileID: 1206518770}
   rightFore: {fileID: 104892687}
-  rightUpperAxis: {x: 1, y: 0, z: 0}
-  rightUpperMaxAngle: 90
-  rightForeAxis: {x: 1, y: 0, z: 0}
-  rightForeMaxAngle: 110
+  rightUpperAxis: {x: -1, y: 0, z: 0}
+  rightUpperMaxAngle: 20
+  rightForeAxis: {x: 0, y: 0, z: -1}
+  rightForeMaxAngle: 90
   rightUpperMinAngle: -90
   rightForeMinAngle: 0
-  rightRaiseGain: 3.5
-  rightCurlGain: 1.2
+  rightRaiseGain: 5
+  rightCurlGain: 5
   leftUpper: {fileID: 335051408}
   leftFore: {fileID: 1176445678}
-  leftUpperAxis: {x: 1, y: 0, z: 0}
-  leftUpperMaxAngle: 90
-  leftForeAxis: {x: 1, y: 0, z: 0}
-  leftForeMaxAngle: 110
+  leftUpperAxis: {x: -1, y: 0, z: 0}
+  leftUpperMaxAngle: 20
+  leftForeAxis: {x: 0, y: 0, z: 1}
+  leftForeMaxAngle: 90
   leftUpperMinAngle: -90
   leftForeMinAngle: 0
-  leftRaiseGain: 3.5
-  leftCurlGain: 1.2
-  headBone: {fileID: 398225769}
-  headYawAxis: {x: 0, y: 1, z: 0}
-  headPitchAxis: {x: 1, y: 0, z: 0}
-  headYawRange: 45
-  headPitchRange: 30
+  leftRaiseGain: 5
+  leftCurlGain: 5
+  headBone: {fileID: 96095478}
+  headYawAxis: {x: 0, y: 0, z: 1}
+  headPitchAxis: {x: -1, y: 0, z: 0}
+  headYawRange: 180
+  headPitchRange: 180
   headCurlAngle: 20
   headGain: 1
-  bodyRoot: {fileID: 1987444678}
+  bodyRoot: {fileID: 96095477}
   bodyYawAxis: {x: 0, y: 1, z: 0}
   bodyYawRange: 70
   bodyYawGain: 4
-  bodyAxisInWorldSpace: 0
+  bodyAxisInWorldSpace: 1
   smoothing: 12
 --- !u!82 &149278808
 AudioSource:
@@ -4006,7 +4016,7 @@ MonoBehaviour:
   retryOnFailure: 1
   maxRetryCount: 3
   currentGestureIndex: -1
-  isTesting: 0
+  isTesting: 1
   isTimeout: 0
   gesturePassed: 0
   skipCurrentGesture: 0
@@ -4101,11 +4111,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 385938994}
   m_CullTransparentMesh: 1
---- !u!4 &398225769 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -3052476751237913372, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
-  m_PrefabInstance: {fileID: 96095475}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &400567353
 GameObject:
   m_ObjectHideFlags: 0
@@ -8667,6 +8672,8 @@ MonoBehaviour:
   MonkeyKing: {fileID: 96095476}
   RedBoy: {fileID: 78479480}
   GestureValidation: {fileID: 385042063}
+  tMP_Text1: {fileID: 1084213698}
+  tMP_Text2: {fileID: 1650661119}
   ModeSwitch: {fileID: 149278804}
   UIControl: {fileID: 1949448578}
   Win: 0
@@ -10603,7 +10610,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 111.448975, y: 0, z: -285.32056, w: 26.753784}
+  m_margin: {x: 111.448975, y: 0, z: -159.71387, w: 26.753784}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -12593,6 +12600,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Skip
   PauseUI: {fileID: 1114648933}
   GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 0}
   GestureValidationControllerOnnx: {fileID: 385042064}
 --- !u!114 &1354673453
 MonoBehaviour:
@@ -16286,7 +16294,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 21.39154, z: -190.552, w: 0}
+  m_margin: {x: 0, y: 21.39154, z: -146.25903, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -19358,6 +19366,7 @@ MonoBehaviour:
   GameLogic: {fileID: 844792193}
   GestureValidation: {fileID: 385042064}
   BegginPlay: 0
+  skiptimer: 0.1
 --- !u!224 &1949448579
 RectTransform:
   m_ObjectHideFlags: 0
@@ -19890,11 +19899,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1986969757}
   m_Mesh: {fileID: 6068538823938138496, guid: fa3f9a602a8bcb44eadac714f1c3b863, type: 3}
---- !u!4 &1987444678 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -1889102022304547840, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
-  m_PrefabInstance: {fileID: 96095475}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2015613894
 GameObject:
   m_ObjectHideFlags: 0
