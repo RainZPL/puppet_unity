@@ -1,6 +1,6 @@
 using HandControl;
 using UnityEngine;
-
+using TMPro;
 public class GameLogic : MonoBehaviour
 {
     public GameObject MonkeyKing;
@@ -10,8 +10,14 @@ public class GameLogic : MonoBehaviour
     Animator RBAnim;
 
     public GameObject GestureValidation;
+
+    public TMP_Text tMP_Text;
+    public TMP_Text tMP_Text2;
     public ModeSwitch ModeSwitch;
     public UIControl UIControl;
+
+    public GameObject info1;
+    public GameObject info2;
     public bool Win;
     public bool Lost;
     public bool Draw;
@@ -46,6 +52,10 @@ public class GameLogic : MonoBehaviour
         {
             if (ModeSwitch.a % 2 == 0)
             {
+                info2.SetActive(true); 
+                info1.SetActive(false);
+                tMP_Text.enabled = true;
+                tMP_Text2.enabled = true;
                 if (Input.GetKeyDown(KeyCode.P))
                 {
                     PlayVideo = true;
@@ -54,9 +64,9 @@ public class GameLogic : MonoBehaviour
 
                 FreeEnd = true;
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = true;
-                if(startTimer!=0)
-                startTimer = startTimer-Time.deltaTime;
-                if (startTimer < 0) 
+                if (startTimer != 0)
+                    startTimer = startTimer - Time.deltaTime;
+                if (startTimer < 0)
                 {
                     Time.timeScale = 0;
                     startTimer = 0;
@@ -84,27 +94,24 @@ public class GameLogic : MonoBehaviour
                 }
 
 
-                    if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().gesturePassed)
+                if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().gesturePassed)
+                {
+                    if (Timer == 3f)
                     {
-                        if (Timer == 3f)
-                        {
-                            EnemyHP = EnemyHP - Damage;
-                            //MKAnim.SetTrigger("fist");
-                            MonkeyKing.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
-                        }
-
-
-                        if (Timer < 0)
-                        {
-                            PlayVideo = true;
-                            Timer = 3f;
-                            //Debug.Log("welldone");
-                        }
-                        Timer = Timer - Time.deltaTime;
+                        EnemyHP = EnemyHP - Damage;
+                        //MKAnim.SetTrigger("fist");
+                        MonkeyKing.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
                     }
 
 
-
+                    if (Timer < 0)
+                    {
+                        PlayVideo = true;
+                        Timer = 3f;
+                        //Debug.Log("welldone");
+                    }
+                    Timer = Timer - Time.deltaTime;
+                }
                 if (PlayerHP <= 0)
                 {
                     Win = false;
@@ -112,7 +119,7 @@ public class GameLogic : MonoBehaviour
                     Draw = false;
                     Time.timeScale = 0;
                 }
-                
+
                 if (EnemyHP <= 0)
                 {
                     Win = true;
@@ -120,7 +127,7 @@ public class GameLogic : MonoBehaviour
                     Draw = false;
                     Time.timeScale = 0;
                 }
-                if (PlayerHP > 0 && EnemyHP > 0 && GestureValidation.GetComponent<GestureValidationControllerOnnx>().currentGestureIndex>4) 
+                if (PlayerHP > 0 && EnemyHP > 0 && GestureValidation.GetComponent<GestureValidationControllerOnnx>().currentGestureIndex > 4)
                 {
                     Win = false;
                     Lost = false;
@@ -133,6 +140,10 @@ public class GameLogic : MonoBehaviour
             {
                 //Debug.Log("free");
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
+                tMP_Text.enabled = false;
+                tMP_Text2.enabled = false;
+                info1.SetActive(true);
+                info2.SetActive(false);
             }
         }
         else
