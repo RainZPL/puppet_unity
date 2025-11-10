@@ -20,7 +20,6 @@ public class UIControl : MonoBehaviour
 
     public Button StartButton;
     public Button EndButton;
-    public Button ArchiveButton;
     public GameObject CountDown;
     public GameObject InGameUI;
     public GameObject PauseUI;
@@ -50,7 +49,6 @@ public class UIControl : MonoBehaviour
 
         StartButton.onClick.AddListener(OnStartButtonClicked);
         EndButton.onClick.AddListener(OnEndButtonClicked);
-        ArchiveButton.onClick.AddListener(OnArchiveClicked);
 
         BegginPlay = false;
     }
@@ -60,25 +58,19 @@ public class UIControl : MonoBehaviour
         //Debug.Log("hello");
         MainCamera.enabled = true;
         MenuCamera.enabled = false;
-        Archive.SetActive(false);
+        Archive.SetActive(true);
         HandArea.SetActive(true);
         Menu.SetActive(false);
+        InGameUI.SetActive(false);
         BegginPlay = true;
         MonkeyKing.transform.position = new Vector3(44.91f, 6.53f, 22.68f);
         RedBoy.transform.position = new Vector3(38.86f, 6.58f, 23.85f);
+        Time.timeScale = 0;
     }
 
     public void OnEndButtonClicked()
     {
         Application.Quit();
-    }
-
-    public void OnArchiveClicked() 
-    {
-        HandArea.SetActive(false);
-        Menu.SetActive(false);
-        Archive.SetActive(true);
-        BegginPlay = false;
     }
 
     // Update is called once per frame
@@ -89,7 +81,6 @@ public class UIControl : MonoBehaviour
 
         if (BegginPlay) 
         {
-            InGameUI.SetActive(true);
             if (GameLogic.FreeEnd)
             {
                 HPbar.SetActive(true);
