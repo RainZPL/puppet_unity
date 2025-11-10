@@ -1,9 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using Unity.InferenceEngine;
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 using TensorFloat = Unity.InferenceEngine.Tensor<float>;
 
 namespace HandControl
@@ -17,8 +18,8 @@ namespace HandControl
         }
 
         public HandTrackingSource handSource;
-        public Text progressLabel;
-        public Text resultLabel;
+        public TextMeshProUGUI progressLabel;
+        public TextMeshProUGUI resultLabel;
         public List<GestureInfo> gestures = new List<GestureInfo>();
         public ModelAsset modelAsset;
         public TextAsset labelMapJson;
@@ -30,14 +31,22 @@ namespace HandControl
         public float passConfidence = 0.5f;
         public int modelMaxLength = 100;
         public int featureCount = 20;
-        public float timeoutSeconds = 15f; // 超时时间
-        public bool autoStartOnEnable = true; // 新增：启用时自动开始
+        public float timeoutSeconds = 15f;
+        public bool autoStartOnEnable = true;
+        public float animationWaitTime = 3f;
         public float DeltaTime;
+
+        // Failure retry parameters
+        public bool retryOnFailure = true;
+        public int maxRetryCount = 3;
+        private int currentRetryCount = 0;
 
         public Action<string> OnGestureMatched;
         public Action OnNewSessionStarted;
-        public Action<int, bool, string> OnGestureResult; // 参数：动作索引, 是否成功, 动作标签
-        public Action OnAllGesturesCompleted; // 所有手势完成回调
+        public Action<int, bool, string> OnGestureResult;
+        public Action OnAllGesturesCompleted;
+        public Action<int, int, string> OnGestureRetry;
+        public Action<string> OnAnimationPlaying;
 
         private readonly List<float[]> frameBuffer = new List<float[]>();
         private readonly List<long> timeBuffer = new List<long>();
@@ -49,17 +58,27 @@ namespace HandControl
         private readonly List<string> labels = new List<string>();
         private readonly Dictionary<string, int> labelLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // 自动触发相关变量
+        // State variables
         public int currentGestureIndex = -1;
         public bool isTesting = false;
         public bool isTimeout = false;
         public bool gesturePassed = false;
-        private float gestureStartTime = 0f;
+        public bool skipCurrentGesture = false;
+        public bool isPlayingAnimation = false;
+        public bool collecting = false;
+        public bool hasRecognizedCurrentGesture = false;
+        public bool isRetryingGesture = false;
 
         private string activeLabel;
-        private bool collecting;
         private string progressText = "Idle";
         private string resultText = "Result: --";
+        private float gestureStartTime = 0f;
+        private float animationStartTime = 0f;
+        private float lastModelRunTime = 0f;
+        private float modelRunInterval = 2f;
+        private float currentGestureElapsedTime = 0f;
+
+        private Coroutine animationCoroutine;
 
         private void Awake()
         {
@@ -72,7 +91,7 @@ namespace HandControl
 
             model = ModelLoader.Load(modelAsset);
             CreateWorker();
-            LoadLabels();
+            LoadLabels(); // 修复：添加了LoadLabels方法
             RefreshUi();
         }
 
@@ -103,6 +122,11 @@ namespace HandControl
             worker?.Dispose();
             worker = null;
             StopTesting();
+
+            if (animationCoroutine != null)
+            {
+                StopCoroutine(animationCoroutine);
+            }
         }
 
         private void Start()
@@ -117,25 +141,157 @@ namespace HandControl
         {
             RefreshUi();
 
-            // 自动触发逻辑
-            if (isTesting && collecting)
-            {
-                float currentTime = Time.time;
-                DeltaTime = currentTime - gestureStartTime;
+            if (!isTesting) return;
 
-                // 检查超时
-                if (!gesturePassed && currentTime - gestureStartTime > timeoutSeconds)
+            // Update elapsed time
+            currentGestureElapsedTime = Time.time - gestureStartTime;
+            DeltaTime = currentGestureElapsedTime;
+
+            // Handle different states
+            if (collecting && !hasRecognizedCurrentGesture)
+            {
+                // Check timeout during collection
+                if (currentGestureElapsedTime > timeoutSeconds)
                 {
-                    isTimeout = true;
-                    OnGestureTimeout();
+                    Debug.Log($"Gesture {CurrentGestureLabel} timeout after {currentGestureElapsedTime:F1}s");
+                    HandleGestureTimeout();
                     return;
                 }
             }
-            else if (isTesting && !collecting && (gesturePassed || isTimeout))
+            else if (gesturePassed && !isPlayingAnimation)
             {
-                // 手势完成或超时后立即开始下一个手势（无等待时间）
+                // Gesture passed - start animation
+                Debug.Log($"Gesture passed, starting animation for {CurrentGestureLabel}");
+                StartAnimationPlayback(CurrentGestureLabel);
+            }
+            else if (isPlayingAnimation)
+            {
+                // Check if animation completed
+                if (Time.time - animationStartTime >= animationWaitTime)
+                {
+                    Debug.Log("Animation completed");
+                    CompleteAnimationPlayback();
+
+                    // After animation, decide what to do next
+                    if (gesturePassed)
+                    {
+                        // Gesture passed - move to next gesture
+                        Debug.Log("Moving to next gesture after successful animation");
+                        StartNextGesture();
+                    }
+                    else if (isRetryingGesture)
+                    {
+                        // Retry animation completed - restart current gesture
+                        Debug.Log("Retry animation completed, restarting current gesture");
+                        isRetryingGesture = false;
+                        StartCurrentGesture();
+                    }
+                }
+            }
+            else if (isTimeout && !collecting && !isPlayingAnimation)
+            {
+                // Timeout - start retry animation
+                Debug.Log($"Gesture timeout, starting retry animation for: {CurrentGestureLabel}");
+                StartRetryAnimation();
+            }
+            else if (skipCurrentGesture && !collecting && !isPlayingAnimation)
+            {
+                // Skip - move to next gesture
+                Debug.Log($"Gesture skipped, moving to next gesture");
                 StartNextGesture();
             }
+        }
+
+        private void HandleGestureTimeout()
+        {
+            if (currentGestureIndex >= 0 && currentGestureIndex < gestures.Count && collecting)
+            {
+                var gesture = gestures[currentGestureIndex];
+                Debug.Log($"Gesture {gesture.label} timeout after {currentGestureElapsedTime:F1}s");
+
+                // Trigger result callback (failure)
+                OnGestureResult?.Invoke(currentGestureIndex, false, gesture.label);
+
+                // Stop collection and set timeout flag
+                collecting = false;
+                isTimeout = true;
+                gesturePassed = false;
+                hasRecognizedCurrentGesture = false;
+
+                frameBuffer.Clear();
+                timeBuffer.Clear();
+                activeLabel = null;
+
+                Debug.Log($"Timeout handling completed for {gesture.label}");
+            }
+        }
+
+        private void StartRetryAnimation()
+        {
+            if (isPlayingAnimation) return;
+
+            // Check retry count
+            if (retryOnFailure && currentRetryCount < maxRetryCount)
+            {
+                currentRetryCount++;
+                Debug.Log($"Starting retry animation for {CurrentGestureLabel} (attempt {currentRetryCount}/{maxRetryCount})");
+
+                // Trigger retry callback
+                OnGestureRetry?.Invoke(currentGestureIndex, currentRetryCount, CurrentGestureLabel);
+
+                // Start retry animation
+                isPlayingAnimation = true;
+                isRetryingGesture = true;
+                animationStartTime = Time.time;
+
+                // Trigger animation playback callback for retry
+                OnAnimationPlaying?.Invoke($"Retry_{CurrentGestureLabel}");
+
+                Debug.Log($"Started retry animation for {CurrentGestureLabel}, duration: {animationWaitTime}s");
+            }
+            else
+            {
+                // Max retries reached, move to next gesture
+                Debug.Log($"Max retries reached for {CurrentGestureLabel}, moving to next gesture");
+                currentRetryCount = 0;
+                isTimeout = false;
+                isRetryingGesture = false;
+                StartNextGesture();
+            }
+        }
+
+        private void StartCurrentGesture()
+        {
+            if (currentGestureIndex < 0 || currentGestureIndex >= gestures.Count) return;
+
+            Debug.Log($"Restarting current gesture: {CurrentGestureLabel}");
+
+            // Reset state flags for current gesture
+            gesturePassed = false;
+            isTimeout = false;
+            skipCurrentGesture = false;
+            isPlayingAnimation = false;
+            collecting = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
+
+            frameBuffer.Clear();
+            timeBuffer.Clear();
+
+            var currentGesture = gestures[currentGestureIndex];
+            if (string.IsNullOrWhiteSpace(currentGesture.label))
+            {
+                Debug.LogWarning($"Skipping gesture at index {currentGestureIndex} due to empty label");
+                StartNextGesture(); // Skip invalid gesture
+                return;
+            }
+
+            // Start current gesture session
+            gestureStartTime = Time.time;
+            currentGestureElapsedTime = 0f;
+            lastModelRunTime = 0f;
+
+            StartCollecting(currentGesture);
         }
 
         private void CreateWorker()
@@ -172,16 +328,31 @@ namespace HandControl
             if (currentGestureIndex < 0 || currentGestureIndex >= gestures.Count) return "Testing...";
 
             var gesture = gestures[currentGestureIndex];
-            float elapsed = Time.time - gestureStartTime;
-            float remaining = Mathf.Max(0f, timeoutSeconds - elapsed);
+            float remaining = Mathf.Max(0f, timeoutSeconds - currentGestureElapsedTime);
 
-            if (gesturePassed) return $"Gesture {gesture.label} passed! Starting next...";
-            if (isTimeout) return $"Gesture {gesture.label} timeout! Starting next...";
+            if (isPlayingAnimation)
+            {
+                float animationElapsed = Time.time - animationStartTime;
+                float animationRemaining = Mathf.Max(0f, animationWaitTime - animationElapsed);
 
-            return $"Testing {gesture.label}: {remaining:F1}s remaining";
+                if (isRetryingGesture)
+                {
+                    return $"Retry animation... {animationRemaining:F1}s (Attempt {currentRetryCount}/{maxRetryCount})";
+                }
+                else
+                {
+                    return $"Playing animation... {animationRemaining:F1}s";
+                }
+            }
+
+            if (gesturePassed) return $"Gesture passed! Starting animation...";
+            if (isTimeout) return $"Timeout! Preparing retry... (Attempt {currentRetryCount + 1}/{maxRetryCount + 1})";
+            if (skipCurrentGesture) return $"Skipped! Preparing next gesture...";
+            if (hasRecognizedCurrentGesture) return $"Processing result...";
+
+            return $"Testing {gesture.label}: {remaining:F1}s remaining, Frames: {frameBuffer.Count}";
         }
 
-        // 开始自动测试序列
         public void StartAutoTesting()
         {
             if (isTesting)
@@ -202,16 +373,24 @@ namespace HandControl
                 return;
             }
 
+            // Reset all state variables
             isTesting = true;
             currentGestureIndex = -1;
             gesturePassed = false;
             isTimeout = false;
+            skipCurrentGesture = false;
+            isPlayingAnimation = false;
+            collecting = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
+            currentRetryCount = 0;
+            lastModelRunTime = 0f;
+            currentGestureElapsedTime = 0f;
 
             Debug.Log($"Starting auto testing with {gestures.Count} gestures");
             StartNextGesture();
         }
 
-        // 停止自动测试
         public void StopTesting()
         {
             if (isTesting)
@@ -220,29 +399,71 @@ namespace HandControl
             }
 
             isTesting = false;
+            collecting = false;
+            isPlayingAnimation = false;
+
+            // Reset all state variables
             currentGestureIndex = -1;
             gesturePassed = false;
             isTimeout = false;
-            StopCollecting("Stopped", true);
+            skipCurrentGesture = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
+            currentRetryCount = 0;
+
+            if (animationCoroutine != null)
+            {
+                StopCoroutine(animationCoroutine);
+                animationCoroutine = null;
+            }
+
+            frameBuffer.Clear();
+            timeBuffer.Clear();
+            activeLabel = null;
+
+            progressText = "Idle";
+            resultText = "Result: --";
         }
 
-        // 重新开始测试
         public void RestartTesting()
         {
             StopTesting();
             StartAutoTesting();
         }
 
-        // 开始下一个手势测试
+        public void SkipCurrentGesture()
+        {
+            if (!isTesting || !collecting) return;
+
+            Debug.Log($"Skipping gesture {CurrentGestureLabel}");
+            skipCurrentGesture = true;
+            collecting = false;
+            hasRecognizedCurrentGesture = false;
+
+            frameBuffer.Clear();
+            timeBuffer.Clear();
+        }
+
         private void StartNextGesture()
         {
-            // 重置所有状态标志
+            Debug.Log("Starting next gesture...");
+
+            // Reset state flags for new gesture
             gesturePassed = false;
             isTimeout = false;
+            skipCurrentGesture = false;
+            isPlayingAnimation = false;
+            collecting = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
+            currentRetryCount = 0; // Reset retry count for new gesture
+
+            frameBuffer.Clear();
+            timeBuffer.Clear();
 
             currentGestureIndex++;
 
-            // 检查是否所有手势都测试完成
+            // Check if all gestures completed
             if (currentGestureIndex >= gestures.Count)
             {
                 Debug.Log("All gestures tested!");
@@ -255,14 +476,15 @@ namespace HandControl
             if (string.IsNullOrWhiteSpace(nextGesture.label))
             {
                 Debug.LogWarning($"Skipping gesture at index {currentGestureIndex} due to empty label");
-                StartNextGesture(); // 跳过无效手势
+                StartNextGesture(); // Skip invalid gesture
                 return;
             }
 
-            // 设置开始时间
+            // Start new gesture session
             gestureStartTime = Time.time;
+            currentGestureElapsedTime = 0f;
+            lastModelRunTime = 0f;
 
-            // 开始收集手势数据
             StartCollecting(nextGesture);
         }
 
@@ -282,47 +504,23 @@ namespace HandControl
 
             collecting = true;
             activeLabel = info.label.Trim();
+            gesturePassed = false;
+            isTimeout = false;
+            skipCurrentGesture = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
 
             OnNewSessionStarted?.Invoke();
-            frameBuffer.Clear();
-            timeBuffer.Clear();
 
             progressText = $"Collecting {activeLabel}...";
             resultText = "Waiting...";
 
-            Debug.Log($"Started collecting gesture: {activeLabel}");
-        }
-
-        private void StopCollecting(string message, bool resetResult)
-        {
-            if (!collecting)
-            {
-                progressText = message;
-                if (resetResult)
-                {
-                    resultText = "Result: --";
-                }
-                return;
-            }
-
-            collecting = false;
-            progressText = message;
-
-            frameBuffer.Clear();
-            timeBuffer.Clear();
-
-            if (resetResult)
-            {
-                resultText = "Result: --";
-            }
-
-            activeLabel = null;
-            Debug.Log($"Stopped collecting: {message}");
+            Debug.Log($"Started collecting gesture: {activeLabel}, timeout: {timeoutSeconds}s");
         }
 
         private void HandleHandFrame(HandTrackingSource.HandFrameData data)
         {
-            if (!collecting || worker == null) return;
+            if (!collecting || worker == null || isPlayingAnimation || hasRecognizedCurrentGesture) return;
 
             bool tracked = data != null && data.tracked && data.landmarks != null && data.landmarks.Length >= 21;
             if (!tracked && !allowEmptyFrames) return;
@@ -334,16 +532,26 @@ namespace HandControl
             float seconds = GetWindowSeconds();
             int needFrames = Mathf.Max(minimumFrames, Mathf.CeilToInt(captureSeconds * Mathf.Max(1f, pretendFps)));
 
+            // Check time interval to prevent frequent model runs
+            float currentTime = Time.time;
+            if (currentTime - lastModelRunTime < modelRunInterval)
+            {
+                progressText = $"Collecting {activeLabel}: {seconds:F1}s/{captureSeconds:F1}s, Frames: {count}/{needFrames}";
+                return;
+            }
+
+            // Run model when enough data is collected
             if (count >= needFrames && seconds >= captureSeconds)
             {
+                lastModelRunTime = currentTime;
+                hasRecognizedCurrentGesture = true;
+
+                Debug.Log($"Running model with {count} frames, {seconds:F1}s of data");
                 RunModel();
-                frameBuffer.Clear();
-                timeBuffer.Clear();
-                progressText = "Window sent";
             }
             else
             {
-                progressText = $"Collecting {activeLabel}: {seconds:F1}s / {captureSeconds:F1}s";
+                progressText = $"Collecting {activeLabel}: {seconds:F1}s/{captureSeconds:F1}s, Frames: {count}/{needFrames}";
             }
         }
 
@@ -361,9 +569,16 @@ namespace HandControl
                     row[id + 2] = point.z;
                 }
             }
+            else
+            {
+                for (int i = 0; i < 63; i++)
+                {
+                    row[i] = 0f;
+                }
+            }
 
             frameBuffer.Add(row);
-            timeBuffer.Add(data != null ? data.timestampMillisec : 0);
+            timeBuffer.Add((long)(Time.time * 1000f));
         }
 
         private float GetWindowSeconds()
@@ -385,10 +600,18 @@ namespace HandControl
 
         private void RunModel()
         {
-            if (worker == null || frameBuffer.Count == 0) return;
+            if (worker == null || frameBuffer.Count == 0)
+            {
+                hasRecognizedCurrentGesture = false;
+                return;
+            }
 
             List<float[]> features = BuildFeatureList(frameBuffer);
-            if (features.Count == 0) return;
+            if (features.Count == 0)
+            {
+                hasRecognizedCurrentGesture = false;
+                return;
+            }
 
             int usableFrames = Mathf.Min(features.Count, modelMaxLength);
             int startIndex = Mathf.Max(0, features.Count - modelMaxLength);
@@ -407,6 +630,15 @@ namespace HandControl
                     mask[0, i] = 1f;
                 }
 
+                for (int i = usableFrames; i < modelMaxLength; i++)
+                {
+                    for (int j = 0; j < featureCount; j++)
+                    {
+                        input[0, i, j] = 0f;
+                    }
+                    mask[0, i] = 0f;
+                }
+
                 try
                 {
                     worker.SetInput("input_seq", input);
@@ -417,6 +649,7 @@ namespace HandControl
                     if (logits == null || logits.Length == 0)
                     {
                         Debug.LogWarning("GestureValidationControllerOnnx: logits missing");
+                        hasRecognizedCurrentGesture = false;
                         return;
                     }
 
@@ -450,80 +683,126 @@ namespace HandControl
 
                     if (!string.IsNullOrEmpty(activeLabel))
                     {
-                        resultText = $"Target {activeLabel} prob = {probText}";
+                        resultText = $"Target {activeLabel} probability = {probText}, Confidence = {confidence:F2}";
 
                         if (targetProb >= passProbability && confidence >= passConfidence)
                         {
-                            resultText = $"Target {activeLabel} prob = {probText} (passed)";
-                            gesturePassed = true;
-                            OnGestureMatched?.Invoke(activeLabel);
+                            resultText = $"Target {activeLabel} probability = {probText} (PASSED)";
 
-                            // 触发结果回调
+                            // Set gesture passed flag
+                            gesturePassed = true;
+                            isTimeout = false;
+                            skipCurrentGesture = false;
+                            collecting = false;
+                            hasRecognizedCurrentGesture = true;
+                            currentRetryCount = 0; // Reset retry count on success
+
+                            // Trigger events
+                            OnGestureMatched?.Invoke(activeLabel);
                             OnGestureResult?.Invoke(currentGestureIndex, true, activeLabel);
 
-                            // 立即停止收集，准备开始下一个手势
-                            StopCollecting("Finished", false);
-
-                            Debug.Log($"Gesture {activeLabel} PASSED with probability {probText}");
+                            Debug.Log($"Gesture {activeLabel} PASSED! Probability: {probText}, Confidence: {confidence:F2}");
                         }
                         else
                         {
-                            Debug.Log($"Gesture {activeLabel} probability: {probText} (needs {passProbability})");
+                            resultText = $"Target {activeLabel} probability = {probText} (FAILED)";
+                            Debug.Log($"Gesture {activeLabel} failed. Probability: {probText} (needs {passProbability}), Confidence: {confidence:F2} (needs {passConfidence})");
+
+                            // Gesture failed, continue collecting
+                            hasRecognizedCurrentGesture = false;
                         }
                     }
                     else
                     {
                         string bestName = bestIndex >= 0 && bestIndex < labels.Count ? labels[bestIndex] : "Unknown";
-                        resultText = $"Prediction: {bestName} prob = {bestProb:F2}";
+                        resultText = $"Prediction: {bestName} probability = {bestProb:F2}";
+                        hasRecognizedCurrentGesture = false;
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.LogError("GestureValidationControllerOnnx: inference failed - " + ex.Message);
+                    hasRecognizedCurrentGesture = false;
                 }
             }
         }
 
-        // 手势超时处理
-        private void OnGestureTimeout()
+        private void StartAnimationPlayback(string gestureLabel)
         {
-            if (currentGestureIndex >= 0 && currentGestureIndex < gestures.Count)
-            {
-                var gesture = gestures[currentGestureIndex];
-                Debug.Log($"Gesture {gesture.label} timeout!");
+            if (isPlayingAnimation) return;
 
-                // 触发结果回调（失败）
-                OnGestureResult?.Invoke(currentGestureIndex, false, gesture.label);
+            isPlayingAnimation = true;
+            isRetryingGesture = false;
+            animationStartTime = Time.time;
 
-                // 立即停止收集，准备开始下一个手势
-                StopCollecting("Timeout", true);
-            }
+            // Trigger animation playback callback
+            OnAnimationPlaying?.Invoke(gestureLabel);
+
+            Debug.Log($"Started animation playback for {gestureLabel}, duration: {animationWaitTime}s");
         }
 
-        private float[] ReadTensor(Tensor tensor)
+        private void CompleteAnimationPlayback()
         {
-            if (tensor == null) return null;
+            isPlayingAnimation = false;
+            Debug.Log("Animation playback completed");
+        }
+
+        // 修复：添加缺失的LoadLabels方法
+        private void LoadLabels()
+        {
+            labels.Clear();
+            labelLookup.Clear();
+
+            if (labelMapJson == null || string.IsNullOrEmpty(labelMapJson.text)) return;
 
             try
             {
-                using (var cpu = tensor.ReadbackAndClone() as TensorFloat)
+                string raw = labelMapJson.text.Trim();
+                if (raw.StartsWith("{") && raw.EndsWith("}"))
                 {
-                    if (cpu == null || cpu.count == 0) return null;
+                    raw = raw.Substring(1, raw.Length - 2);
+                }
 
-                    float[] arr = new float[cpu.count];
-                    for (int i = 0; i < arr.Length; i++)
+                if (string.IsNullOrEmpty(raw)) return;
+
+                string[] parts = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                SortedDictionary<int, string> sorted = new SortedDictionary<int, string>();
+
+                foreach (string part in parts)
+                {
+                    string[] pair = part.Split(new[] { ':' }, 2);
+                    if (pair.Length < 2) continue;
+
+                    string keyText = pair[0].Replace("\"", string.Empty).Trim();
+                    string valueText = pair[1].Replace("\"", string.Empty).Trim();
+
+                    if (int.TryParse(keyText, out int key))
                     {
-                        arr[i] = cpu[i];
+                        sorted[key] = valueText;
                     }
-                    return arr;
+                }
+
+                foreach (var kv in sorted)
+                {
+                    while (labels.Count <= kv.Key)
+                    {
+                        labels.Add(string.Empty);
+                    }
+                    labels[kv.Key] = kv.Value;
+
+                    if (!labelLookup.ContainsKey(kv.Value))
+                    {
+                        labelLookup[kv.Value] = kv.Key;
+                    }
                 }
             }
-            finally
+            catch (Exception ex)
             {
-                tensor.Dispose();
+                Debug.LogWarning("GestureValidationControllerOnnx: failed to parse label map - " + ex.Message);
             }
         }
 
+        // 修复：添加缺失的BuildFeatureList方法
         private List<float[]> BuildFeatureList(List<float[]> frames)
         {
             List<float[]> list = new List<float[]>(frames.Count);
@@ -561,6 +840,62 @@ namespace HandControl
             return list;
         }
 
+        // 修复：添加缺失的ReadTensor方法
+        private float[] ReadTensor(Tensor tensor)
+        {
+            if (tensor == null) return null;
+
+            try
+            {
+                using (var cpu = tensor.ReadbackAndClone() as TensorFloat)
+                {
+                    if (cpu == null || cpu.count == 0) return null;
+
+                    float[] arr = new float[cpu.count];
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        arr[i] = cpu[i];
+                    }
+                    return arr;
+                }
+            }
+            finally
+            {
+                tensor.Dispose();
+            }
+        }
+
+        // 修复：添加缺失的ComputeSoftmax方法
+        private float[] ComputeSoftmax(IReadOnlyList<float> logits)
+        {
+            float[] output = new float[logits.Count];
+            if (logits.Count == 0) return output;
+
+            float max = logits[0];
+            for (int i = 1; i < logits.Count; i++)
+            {
+                if (logits[i] > max) max = logits[i];
+            }
+
+            float total = 0f;
+            for (int i = 0; i < logits.Count; i++)
+            {
+                float value = Mathf.Exp(logits[i] - max);
+                output[i] = value;
+                total += value;
+            }
+
+            if (total <= 0f) return output;
+
+            for (int i = 0; i < output.Length; i++)
+            {
+                output[i] /= total;
+            }
+
+            return output;
+        }
+
+        // 修复：添加缺失的ExtractFeatures方法
         private float[] ExtractFeatures(float[] frame)
         {
             if (frame == null || frame.Length < 63)
@@ -637,6 +972,7 @@ namespace HandControl
             return data;
         }
 
+        // 修复：添加缺失的NormaliseHand方法
         private void NormaliseHand()
         {
             Vector3 wrist = rawPoints[0];
@@ -660,94 +996,17 @@ namespace HandControl
             }
         }
 
-        private float[] ComputeSoftmax(IReadOnlyList<float> logits)
-        {
-            float[] output = new float[logits.Count];
-            if (logits.Count == 0) return output;
-
-            float max = logits[0];
-            for (int i = 1; i < logits.Count; i++)
-            {
-                if (logits[i] > max) max = logits[i];
-            }
-
-            float total = 0f;
-            for (int i = 0; i < logits.Count; i++)
-            {
-                float value = Mathf.Exp(logits[i] - max);
-                output[i] = value;
-                total += value;
-            }
-
-            if (total <= 0f) return output;
-
-            for (int i = 0; i < output.Length; i++)
-            {
-                output[i] /= total;
-            }
-
-            return output;
-        }
-
-        private void LoadLabels()
-        {
-            labels.Clear();
-            labelLookup.Clear();
-
-            if (labelMapJson == null || string.IsNullOrEmpty(labelMapJson.text)) return;
-
-            try
-            {
-                string raw = labelMapJson.text.Trim();
-                if (raw.StartsWith("{") && raw.EndsWith("}"))
-                {
-                    raw = raw.Substring(1, raw.Length - 2);
-                }
-
-                if (string.IsNullOrEmpty(raw)) return;
-
-                string[] parts = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                SortedDictionary<int, string> sorted = new SortedDictionary<int, string>();
-
-                foreach (string part in parts)
-                {
-                    string[] pair = part.Split(new[] { ':' }, 2);
-                    if (pair.Length < 2) continue;
-
-                    string keyText = pair[0].Replace("\"", string.Empty).Trim();
-                    string valueText = pair[1].Replace("\"", string.Empty).Trim();
-
-                    if (int.TryParse(keyText, out int key))
-                    {
-                        sorted[key] = valueText;
-                    }
-                }
-
-                foreach (var kv in sorted)
-                {
-                    while (labels.Count <= kv.Key)
-                    {
-                        labels.Add(string.Empty);
-                    }
-                    labels[kv.Key] = kv.Value;
-
-                    if (!labelLookup.ContainsKey(kv.Value))
-                    {
-                        labelLookup[kv.Value] = kv.Key;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning("GestureValidationControllerOnnx: failed to parse label map - " + ex.Message);
-            }
-        }
-
-        // 公共属性访问器
+        // Public property accessors
         public bool IsTesting => isTesting;
         public int CurrentGestureIndex => currentGestureIndex;
         public string CurrentGestureLabel => currentGestureIndex >= 0 && currentGestureIndex < gestures.Count ? gestures[currentGestureIndex].label : "";
         public int TotalGestureCount => gestures.Count;
-        public float TimeRemaining => isTesting ? Mathf.Max(0f, timeoutSeconds - (Time.time - gestureStartTime)) : 0f;
+        public float TimeRemaining => isTesting ? Mathf.Max(0f, timeoutSeconds - currentGestureElapsedTime) : 0f;
+        public bool IsPlayingAnimation => isPlayingAnimation;
+        public float AnimationTimeRemaining => isPlayingAnimation ? Mathf.Max(0f, animationWaitTime - (Time.time - animationStartTime)) : 0f;
+        public float CurrentElapsedTime => currentGestureElapsedTime;
+        public int CurrentRetryCount => currentRetryCount;
+        public int MaxRetryCount => maxRetryCount;
+        public bool IsRetryingGesture => isRetryingGesture;
     }
 }

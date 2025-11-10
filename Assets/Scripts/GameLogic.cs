@@ -14,22 +14,29 @@ public class GameLogic : MonoBehaviour
     public UIControl UIControl;
     public bool Win;
     public bool Lost;
+    public bool Draw;
 
     public bool FreeEnd;
     public bool PlayVideo;
 
     float Damage = 20;
-    public float PlayerHP = 100;
-    public float EnemyHP = 100;    
+    public float PlayerHP = 80;
+    public float EnemyHP = 80;
+    public float Timer;
+    public float startTimer = 0.1f;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        MonkeyKing.transform.position = new Vector3(46.3f, 13.2f, 36.9f);
+        RedBoy.transform.position = new Vector3(41.6f, 13.1f, 36.8f);
         MKAnim = MonkeyKing.GetComponent<Animator>();
         RBAnim = RedBoy.GetComponent<Animator>();
         FreeEnd = false;
         Time.timeScale = 1;
         PlayVideo = true;
+        Timer = 3f;
+        startTimer = 0.1f;
     }
 
     // Update is called once per frame
@@ -39,37 +46,88 @@ public class GameLogic : MonoBehaviour
         {
             if (ModeSwitch.a % 2 == 0)
             {
+                if (Input.GetKeyDown(KeyCode.P))
+                {
+                    PlayVideo = true;
+                    Time.timeScale = 0;
+                }
+
                 FreeEnd = true;
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = true;
+                if(startTimer!=0)
+                startTimer = startTimer-Time.deltaTime;
+                if (startTimer < 0) 
+                {
+                    Time.timeScale = 0;
+                    startTimer = 0;
+                }
+
 
                 if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().isTimeout)
                 {
-                    PlayerHP = PlayerHP - Damage;
-                    RBAnim.SetTrigger("Attack");
-                    if (PlayerHP <= 0)
+                    //Debug.Log("rbtimeout");
+                    if (Timer == 3f)
                     {
-                        Win = false;
-                        Lost = true;
-                        PlayVideo = true;
+                        //Debug.Log("RBATTACK");
+                        PlayerHP = PlayerHP - Damage;
+                        RBAnim.SetTrigger("Attack");
+                        RedBoy.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
                     }
-                    Time.timeScale = 0;
-                    //Debug.Log("timeover");
+
+                    Timer = Timer - Time.deltaTime;
+                    if (Timer < 0)
+                    {
+                        PlayVideo = true;
+                        Timer = 3f;
+                        //Debug.Log("timeover");
+                    }
                 }
-                else
-                {
+
+
                     if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().gesturePassed)
                     {
-                        EnemyHP = PlayerHP - Damage;
-                        MKAnim.SetTrigger("fist");
-                        if (PlayerHP <= 0)
+                        if (Timer == 3f)
                         {
-                            Win = true;
-                            Lost = false;
-                            PlayVideo = true;
+                            EnemyHP = EnemyHP - Damage;
+                            //MKAnim.SetTrigger("fist");
+                            MonkeyKing.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
                         }
-                        //Debug.Log("welldone");
+
+
+                        if (Timer < 0)
+                        {
+                            PlayVideo = true;
+                            Timer = 3f;
+                            //Debug.Log("welldone");
+                        }
+                        Timer = Timer - Time.deltaTime;
                     }
+
+
+
+                if (PlayerHP <= 0)
+                {
+                    Win = false;
+                    Lost = true;
+                    Draw = false;
+                    Time.timeScale = 0;
                 }
+                
+                if (EnemyHP <= 0)
+                {
+                    Win = true;
+                    Lost = false;
+                    Draw = false;
+                    Time.timeScale = 0;
+                }
+                if (PlayerHP > 0 && EnemyHP > 0 && GestureValidation.GetComponent<GestureValidationControllerOnnx>().currentGestureIndex>4) 
+                {
+                    Win = false;
+                    Lost = false;
+                    Draw = true;
+                    Time.timeScale = 0;
+                }
+
             }
             else
             {
@@ -77,7 +135,7 @@ public class GameLogic : MonoBehaviour
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
             }
         }
-        else 
+        else
         {
             GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = false;
         }
