@@ -5,6 +5,7 @@ public class Skip : MonoBehaviour
 {
     public GameObject PauseUI;
     public GameLogic GameLogic;
+    public UIControl UIControl;
     public GestureValidationControllerOnnx GestureValidationControllerOnnx;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public void OnButtonClick() 
@@ -13,5 +14,6 @@ public class Skip : MonoBehaviour
         Time.timeScale = 1.0f;
         GameLogic.PlayVideo = false;
         GestureValidationControllerOnnx.SkipCurrentGesture();
+        UIControl.OnSkip();
     }
 }

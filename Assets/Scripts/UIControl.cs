@@ -29,6 +29,8 @@ public class UIControl : MonoBehaviour
     public GestureValidationControllerOnnx GestureValidation;
 
     public bool BegginPlay;
+    bool isskiped = false;
+    public float skiptimer = 0.1f;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -73,6 +75,11 @@ public class UIControl : MonoBehaviour
         Application.Quit();
     }
 
+    public void OnSkip() 
+    {
+        isskiped = true;
+    }
+
     // Update is called once per frame
     void Update()
     {
@@ -89,6 +96,18 @@ public class UIControl : MonoBehaviour
                 {
                     PauseUI.SetActive(true);
                     GameLogic.Timer = 3;
+                }
+
+                if (isskiped) 
+                {
+                    skiptimer = skiptimer-Time.deltaTime;
+                    if (skiptimer < 0)
+                    {
+                        isskiped = false;
+                        PauseUI.SetActive(true);
+                        Time.timeScale = 0f;
+                        skiptimer = 0.1f;
+                    }
                 }
             }
             else
