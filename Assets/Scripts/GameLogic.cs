@@ -82,6 +82,7 @@ public class GameLogic : MonoBehaviour
                     Win = false;
                     Lost = true;
                     Draw = false;
+                    PlayVideo = false;
                     Time.timeScale = 0;
                 }
                 
@@ -90,6 +91,7 @@ public class GameLogic : MonoBehaviour
                     Win = true;
                     Lost = false;
                     Draw = false;
+                    PlayVideo = false;
                     Time.timeScale = 0;
                 }
                 if (PlayerHP > 0 && EnemyHP > 0 && GestureValidation.GetComponent<GestureValidationControllerOnnx>().currentGestureIndex>4) 
@@ -97,6 +99,7 @@ public class GameLogic : MonoBehaviour
                     Win = false;
                     Lost = false;
                     Draw = true;
+                    PlayVideo = false;
                     Time.timeScale = 0;
                 }
 

@@ -104,23 +104,26 @@ public class UIControl : MonoBehaviour
             }
             else
             {
-                CountDown.GetComponent<TextMeshProUGUI>().text = "Freeflow Play" + ":"+" "+"Try to move your fingers and see what's MonkeyKing gonna do";
+                CountDown.GetComponent<TextMeshProUGUI>().text = "Freeflow Play";
             }
 
             if (GameLogic.Win) 
             {
                 Time.timeScale = 0;
                 WinPannel.SetActive(true);
+                PauseUI.SetActive(false);
             }
             if (GameLogic.Lost) 
             {
                 Time.timeScale = 0;
                 LostPannel.SetActive(true);
+                PauseUI.SetActive(false);
             }
             if (GameLogic.Draw) 
             {
                 Time.timeScale = 0;
                 DrawPannel.SetActive(true);
+                PauseUI.SetActive(false);
             }
         }
     }

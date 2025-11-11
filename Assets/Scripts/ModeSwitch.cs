@@ -31,6 +31,7 @@ public class ModeSwitch : MonoBehaviour
             gameObject.GetComponent<FingerRotationDriver>().enabled = false;
             gameObject.GetComponent<Animator>().enabled = true;
             hp.SetActive(true);
+            countdown.SetActive(false);
         }
         else
         {
@@ -38,6 +39,7 @@ public class ModeSwitch : MonoBehaviour
             gameObject.GetComponent<Animator>().enabled = false;
             Time.timeScale = 1.0f;
             hp.SetActive(false);
+            countdown.SetActive(true);
         }
     }
 }
