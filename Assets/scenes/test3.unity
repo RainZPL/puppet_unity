@@ -7537,7 +7537,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 711, y: 740}
+  m_AnchoredPosition: {x: 679, y: 740}
   m_SizeDelta: {x: 600, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &716128068
@@ -7625,7 +7625,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -290.94318, y: 0, z: -335.8783, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -10186,6 +10186,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Back
   detailPannel: {fileID: 1535108669}
   frontPannel: {fileID: 314107227}
+  audiosource: {fileID: 314107227}
 --- !u!114 &1032610881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21383,7 +21384,7 @@ PrefabInstance:
       objectReference: {fileID: 1884134703}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.size
-      value: 5
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: externalTextDisplays.Array.size
@@ -21411,6 +21412,10 @@ PrefabInstance:
       objectReference: {fileID: 32900000, guid: 846e0a664bce0cb49a446bd2611bfdab, type: 3}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[4].videoClip
+      value: 
+      objectReference: {fileID: 32900000, guid: 04456fbc10a4d78428b01da71af69afc, type: 3}
+    - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
+      propertyPath: mediaQueue.Array.data[5].videoClip
       value: 
       objectReference: {fileID: 32900000, guid: 04456fbc10a4d78428b01da71af69afc, type: 3}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
@@ -21452,6 +21457,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[4].displayText
+      value: "Punch: \n\nCurl the thumb and three fingers backward, then extend them
+        forcefully forward while slightly rotating the wrist in the direction of
+        the punch.\nNote: Apply sufficient strength during the punch but maintain
+        control of the wrist to ensure proper direction and stability.\n"
+      objectReference: {fileID: 0}
+    - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
+      propertyPath: mediaQueue.Array.data[5].displayText
       value: "Punch: \n\nCurl the thumb and three fingers backward, then extend them
         forcefully forward while slightly rotating the wrist in the direction of
         the punch.\nNote: Apply sufficient strength during the punch but maintain
