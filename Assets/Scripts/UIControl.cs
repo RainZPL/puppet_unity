@@ -3,6 +3,7 @@ using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 public class UIControl : MonoBehaviour
 {
@@ -91,28 +92,19 @@ public class UIControl : MonoBehaviour
             if (GameLogic.FreeEnd)
             {
                 HPbar.SetActive(true);
-                CountDown.GetComponent<TextMeshProUGUI>().text = "Attack Time" + " " + GestureValidation.DeltaTime.ToString();
+                CountDown.GetComponent<TextMeshProUGUI>().text = "Gesture Codex";
                 if (GameLogic.PlayVideo) 
                 {
+                    //PauseUI.GetComponent<VideoPlayer>().playOnAwake = true;
                     PauseUI.SetActive(true);
-                    GameLogic.Timer = 3;
-                }
 
-                if (isskiped) 
-                {
-                    skiptimer = skiptimer-Time.deltaTime;
-                    if (skiptimer < 0)
-                    {
-                        isskiped = false;
-                        PauseUI.SetActive(true);
-                        Time.timeScale = 0f;
-                        skiptimer = 0.1f;
-                    }
+                    GameLogic.Timer = 3;
+                    Time.timeScale = 0;
                 }
             }
             else
             {
-                CountDown.GetComponent<TextMeshProUGUI>().text = "FreeMode Time";
+                CountDown.GetComponent<TextMeshProUGUI>().text = "Freeflow Play" + ":"+" "+"Try to move your fingers and see what's MonkeyKing gonna do";
             }
 
             if (GameLogic.Win) 

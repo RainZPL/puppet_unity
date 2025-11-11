@@ -35,6 +35,7 @@ namespace HandControl
         public bool autoStartOnEnable = true;
         public float animationWaitTime = 3f;
         public float DeltaTime;
+        public GameLogic gamelogic;
 
         // Failure retry parameters
         public bool retryOnFailure = true;
@@ -177,6 +178,7 @@ namespace HandControl
                     {
                         // Gesture passed - move to next gesture
                         Debug.Log("Moving to next gesture after successful animation");
+                        gamelogic.PlayerAnimEnd();
                         StartNextGesture();
                     }
                     else if (isRetryingGesture)
@@ -185,6 +187,7 @@ namespace HandControl
                         Debug.Log("Retry animation completed, restarting current gesture");
                         isRetryingGesture = false;
                         StartCurrentGesture();
+                        gamelogic.EnemyAnimEnd();
                     }
                 }
             }
@@ -217,6 +220,7 @@ namespace HandControl
                 isTimeout = true;
                 gesturePassed = false;
                 hasRecognizedCurrentGesture = false;
+                gamelogic.EnemyAttack();
 
                 frameBuffer.Clear();
                 timeBuffer.Clear();
@@ -690,6 +694,7 @@ namespace HandControl
                             resultText = $"Target {activeLabel} probability = {probText} (PASSED)";
 
                             // Set gesture passed flag
+                            gamelogic.PlayerAttack();
                             gesturePassed = true;
                             isTimeout = false;
                             skipCurrentGesture = false;

@@ -12,8 +12,7 @@ public class Skip : MonoBehaviour
     {
         PauseUI.SetActive(false);
         Time.timeScale = 1.0f;
-        GameLogic.PlayVideo = false;
+        GameLogic.PlayVideo = true;
         GestureValidationControllerOnnx.SkipCurrentGesture();
-        UIControl.OnSkip();
     }
 }

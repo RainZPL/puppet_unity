@@ -1742,7 +1742,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 41.706177, y: 138}
+  m_AnchoredPosition: {x: 41.706177, y: 124.70001}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &106553583
@@ -2690,7 +2690,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 19, y: -58.7}
-  m_SizeDelta: {x: 1349.8, y: 1115}
+  m_SizeDelta: {x: 1349.8, y: 1407.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &191626909
 MonoBehaviour:
@@ -3589,8 +3589,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -600, y: 1194}
-  m_SizeDelta: {x: 600, y: 200}
+  m_AnchoredPosition: {x: -600, y: 1200.8}
+  m_SizeDelta: {x: 500, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &333977347
 MonoBehaviour:
@@ -3803,7 +3803,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1505.45, y: 1170.06}
+  m_SizeDelta: {x: 1505.45, y: 1500.8}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &343697390
 MonoBehaviour:
@@ -4064,8 +4064,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 251.4, y: 1019}
-  m_SizeDelta: {x: 482.45, y: 350}
+  m_AnchoredPosition: {x: 290, y: 1107}
+  m_SizeDelta: {x: 350, y: 350}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &385938996
 MonoBehaviour:
@@ -4087,7 +4087,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 2800000, guid: 9ef46c71e29bea74da8a5acfbb391b41, type: 3}
+  m_Texture: {fileID: 2800000, guid: 6d863a346beb5c84692b10b2bb4c9492, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -7520,7 +7520,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &716128067
 RectTransform:
   m_ObjectHideFlags: 0
@@ -7537,7 +7537,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 711, y: 740}
+  m_AnchoredPosition: {x: 877, y: 571.2}
   m_SizeDelta: {x: 600, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &716128068
@@ -7594,8 +7594,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_wordSpacing: 0
@@ -7988,8 +7988,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -604.5, y: 1787}
-  m_SizeDelta: {x: 800, y: 800}
+  m_AnchoredPosition: {x: -604.5, y: 1628}
+  m_SizeDelta: {x: 600, y: 600}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &767737996
 MonoBehaviour:
@@ -8820,8 +8820,8 @@ RectTransform:
   - {fileID: 106553582}
   - {fileID: 1084213696}
   - {fileID: 1650661121}
-  - {fileID: 1925281309}
   - {fileID: 1933839579}
+  - {fileID: 1925281309}
   m_Father: {fileID: 1837958892}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -10169,7 +10169,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 513, y: 784}
+  m_AnchoredPosition: {x: 513, y: 822}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1032610880
@@ -10526,7 +10526,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -148, y: 105}
+  m_AnchoredPosition: {x: -123.583824, y: 91.19998}
   m_SizeDelta: {x: 300, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1084213697
@@ -11856,7 +11856,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1323504128}
   - {fileID: 1843737163}
   - {fileID: 385938995}
   - {fileID: 1032610879}
@@ -12469,142 +12468,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1304340373}
   m_Mesh: {fileID: 2443904453477644371, guid: 6272a4797bf2df84286aa94db68a2bef, type: 3}
---- !u!1 &1323504127
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1323504128}
-  - component: {fileID: 1323504130}
-  - component: {fileID: 1323504129}
-  m_Layer: 0
-  m_Name: Text (TMP)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1323504128
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1323504127}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -43029.36}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1212683342}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 553, y: 1167}
-  m_SizeDelta: {x: 200, y: 50}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1323504129
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1323504127}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_text: Introduction to Jinjiang Glove Puppetry
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
-  m_fontMaterial: {fileID: 0}
-  m_fontMaterials: []
-  m_fontColor32:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
-  m_enableVertexGradient: 0
-  m_colorMode: 3
-  m_fontColorGradient:
-    topLeft: {r: 1, g: 1, b: 1, a: 1}
-    topRight: {r: 1, g: 1, b: 1, a: 1}
-    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
-    bottomRight: {r: 1, g: 1, b: 1, a: 1}
-  m_fontColorGradientPreset: {fileID: 0}
-  m_spriteAsset: {fileID: 0}
-  m_tintAllSprites: 0
-  m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: -1183493901
-  m_overrideHtmlColors: 0
-  m_faceColor:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontSize: 20
-  m_fontSizeBase: 20
-  m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
-  m_fontStyle: 1
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
-  m_textAlignment: 65535
-  m_characterSpacing: 0
-  m_wordSpacing: 0
-  m_lineSpacing: 0
-  m_lineSpacingMax: 0
-  m_paragraphSpacing: 0
-  m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
-  m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
-  m_linkedTextComponent: {fileID: 0}
-  parentLinkedComponent: {fileID: 0}
-  m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
-  m_enableExtraPadding: 0
-  checkPaddingRequired: 0
-  m_isRichText: 1
-  m_EmojiFallbackSupport: 1
-  m_parseCtrlCharacters: 1
-  m_isOrthographic: 1
-  m_isCullingEnabled: 0
-  m_horizontalMapping: 0
-  m_verticalMapping: 0
-  m_uvLineOffset: 0
-  m_geometrySortingOrder: 0
-  m_IsTextObjectScaleStatic: 0
-  m_VertexBufferAutoSizeReduction: 0
-  m_useMaxVisibleDescender: 1
-  m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -222.06458, w: 0}
-  m_isUsingLegacyAnimationComponent: 0
-  m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
-  m_baseMaterial: {fileID: 0}
-  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!222 &1323504130
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1323504127}
-  m_CullTransparentMesh: 1
 --- !u!1 &1332209395
 GameObject:
   m_ObjectHideFlags: 0
@@ -12732,7 +12595,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 14.45, y: -247}
+  m_AnchoredPosition: {x: 14.45, y: -245}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1354673452
@@ -14387,8 +14250,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -600, y: 615}
-  m_SizeDelta: {x: 600, y: 200}
+  m_AnchoredPosition: {x: -600, y: 836}
+  m_SizeDelta: {x: 500, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1488051697
 MonoBehaviour:
@@ -14959,7 +14822,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 244, y: -248}
+  m_AnchoredPosition: {x: 244, y: -244}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1510965020
@@ -15959,7 +15822,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -211, y: -248}
+  m_AnchoredPosition: {x: -211, y: -247}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1620129910
@@ -16473,7 +16336,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -86, y: 96}
+  m_AnchoredPosition: {x: -61.89382, y: 65.19998}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1655334867
@@ -17355,7 +17218,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 386.6, y: 199.3}
+  m_SizeDelta: {x: 294.2, y: 128.1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1805171145
 MonoBehaviour:
@@ -17782,8 +17645,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 1169, y: -144}
-  m_SizeDelta: {x: 473.1, y: 259.4}
+  m_AnchoredPosition: {x: 1193, y: -144}
+  m_SizeDelta: {x: 431.81238, y: 209.9715}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &1837958893
 MonoBehaviour:
@@ -18056,7 +17919,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 645, y: 1118}
+  m_AnchoredPosition: {x: 701, y: 1191}
   m_SizeDelta: {x: 389.28, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1843737164
@@ -18119,8 +17982,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 15
-  m_fontSizeBase: 15
+  m_fontSize: 12
+  m_fontSizeBase: 12
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -18157,7 +18020,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -130.36487, w: 0}
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -18787,7 +18650,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -1.1}
-  m_SizeDelta: {x: 386.6, y: 199.3}
+  m_SizeDelta: {x: 285.3, y: 139.3}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1881119838
 MonoBehaviour:
@@ -19387,8 +19250,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: -179.339, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -0.44503784, y: -41.199997}
-  m_SizeDelta: {x: -172.4901, y: -196.4}
+  m_AnchoredPosition: {x: 28.881714, y: -59.162537}
+  m_SizeDelta: {x: -176.55988, y: -193.05396}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1933839580
 MonoBehaviour:
@@ -19563,11 +19426,11 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1049517605}
+  - {fileID: 314107228}
   - {fileID: 1535108670}
   - {fileID: 471406876}
   - {fileID: 1226728109}
   - {fileID: 1673925046}
-  - {fileID: 314107228}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -20751,7 +20614,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Start Game
+  m_text: Beggin Play
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -21283,7 +21146,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1291958095317208116, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 419
+      value: 467.33
       objectReference: {fileID: 0}
     - target: {fileID: 1291958095317208116, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -21319,7 +21182,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1291958095317208116, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 5
+      value: 37.5
       objectReference: {fileID: 0}
     - target: {fileID: 1291958095317208116, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -21415,26 +21278,31 @@ PrefabInstance:
       objectReference: {fileID: 32900000, guid: 04456fbc10a4d78428b01da71af69afc, type: 3}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[0].displayText
-      value: "Turn Around: \n\nPlace the thumb against the index finger and slide
-        it forward to make the Monkey King turn naturally. For the opposite direction,
-        slide the thumb backward.\nNote: Keep the index finger still and maintain
-        consistent motion throughout.\n"
+      value: 'Turn Around: Place the thumb against the index finger and slide it
+        forward to make the Monkey King turn naturally. For the opposite direction,
+        slide the thumb backward.
+
+        Note: Keep the index finger still and
+        maintain consistent motion throughout.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[1].displayText
-      value: "Bow: \n\nExtend the thumb and the three fingers in a forward pinch,
-        then press downward while slightly lowering the wrist and index finger. Lift
-        the hand to the start position afterward.\nNote: 1. Avoid any head movement
+      value: 'Bow: Extend the thumb and the three fingers in a forward pinch, then
+        press downward while slightly lowering the wrist and index finger. Lift the
+        hand to the start position afterward.
+
+        Note: 1. Avoid any head movement
         during the downward motion. 2. Keep the wrist and index finger movement controlled
-        and minimal.\n"
+        and minimal.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[2].displayText
-      value: 'Turn Head:
-
-
-        Extend the thumb and middle finger downward in
-        quick alternation, making the head move side to side with small, rapid motions.
+      value: 'Turn Head: Extend the thumb and middle finger downward in quick alternation,
+        making the head move side to side with small, rapid motions.
 
         Note:
         Keep the pressure from the thumb and middle finger even throughout the movement.
@@ -21443,27 +21311,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[3].displayText
-      value: "Sword Dance: \n\nPlace the thumb against the index finger and keep
-        the other three fingers together. Swing and rotate the fingers resembling
-        the shape of \u201C\u221E\u201D. During the movement, allow the wrist to
-        follow with corresponding rotation.\r\nNote: 1. Ensure that the fingers rotate
-        both forward and backward while swinging. 2. Avoid excessive wrist movement,
-        which may cause Monkey King to tilt to one side.\r\n"
+      value: "Sword Dance: Place the thumb against the index finger and keep the
+        other three fingers together. Swing and rotate the fingers resembling the
+        shape of \u201C\u221E\u201D. During the movement, allow the wrist to follow
+        with corresponding rotation.\r\nNote: 1. Ensure that the fingers rotate both
+        forward and backward while swinging. 2. Avoid excessive wrist movement, which
+        may cause Monkey King to tilt to one side.\r\n"
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[4].displayText
-      value: "Punch: \n\nCurl the thumb and three fingers backward, then extend them
+      value: 'Punch: Curl the thumb and three fingers backward, then extend them
         forcefully forward while slightly rotating the wrist in the direction of
-        the punch.\nNote: Apply sufficient strength during the punch but maintain
-        control of the wrist to ensure proper direction and stability.\n"
-      objectReference: {fileID: 0}
-    - target: {fileID: 8846909172322919692, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 492
-      objectReference: {fileID: 0}
-    - target: {fileID: 8846909172322919692, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 113
+        the punch.
+
+        Note: Apply sufficient strength during the punch but
+        maintain control of the wrist to ensure proper direction and stability.
+
+'
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

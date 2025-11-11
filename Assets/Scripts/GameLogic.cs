@@ -23,20 +23,42 @@ public class GameLogic : MonoBehaviour
     public float PlayerHP = 80;
     public float EnemyHP = 80;
     public float Timer;
-    public float startTimer = 0.1f;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        MonkeyKing.transform.position = new Vector3(46.3f, 13.2f, 36.9f);
-        RedBoy.transform.position = new Vector3(41.6f, 13.1f, 36.8f);
+        MonkeyKing.transform.position = new Vector3(45.8f, 13.2f, 36.9f);
+        RedBoy.transform.position = new Vector3(42f, 13.1f, 36.8f);
         MKAnim = MonkeyKing.GetComponent<Animator>();
         RBAnim = RedBoy.GetComponent<Animator>();
         FreeEnd = false;
         Time.timeScale = 1;
         PlayVideo = true;
         Timer = 3f;
-        startTimer = 0.1f;
+    }
+
+    public void PlayerAttack() 
+    {
+        EnemyHP = EnemyHP - Damage;
+        //MKAnim.SetTrigger("fist");
+        MonkeyKing.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
+    }
+
+    public void EnemyAttack() 
+    {
+        PlayerHP = PlayerHP - Damage;
+        RBAnim.SetTrigger("Attack");
+        RedBoy.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
+    }
+
+    public void PlayerAnimEnd() 
+    {
+        PlayVideo = true;
+    }
+
+    public void EnemyAnimEnd() 
+    {
+        PlayVideo = true;
     }
 
     // Update is called once per frame
@@ -54,56 +76,6 @@ public class GameLogic : MonoBehaviour
 
                 FreeEnd = true;
                 GestureValidation.GetComponent<GestureValidationControllerOnnx>().enabled = true;
-                if(startTimer!=0)
-                startTimer = startTimer-Time.deltaTime;
-                if (startTimer < 0) 
-                {
-                    Time.timeScale = 0;
-                    startTimer = 0;
-                }
-
-
-                if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().isTimeout)
-                {
-                    //Debug.Log("rbtimeout");
-                    if (Timer == 3f)
-                    {
-                        //Debug.Log("RBATTACK");
-                        PlayerHP = PlayerHP - Damage;
-                        RBAnim.SetTrigger("Attack");
-                        RedBoy.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
-                    }
-
-                    Timer = Timer - Time.deltaTime;
-                    if (Timer < 0)
-                    {
-                        PlayVideo = true;
-                        Timer = 3f;
-                        //Debug.Log("timeover");
-                    }
-                }
-
-
-                    if (GestureValidation.GetComponent<GestureValidationControllerOnnx>().gesturePassed)
-                    {
-                        if (Timer == 3f)
-                        {
-                            EnemyHP = EnemyHP - Damage;
-                            //MKAnim.SetTrigger("fist");
-                            MonkeyKing.GetComponent<AudioSource>().GetComponent<AudioSource>().Play();
-                        }
-
-
-                        if (Timer < 0)
-                        {
-                            PlayVideo = true;
-                            Timer = 3f;
-                            //Debug.Log("welldone");
-                        }
-                        Timer = Timer - Time.deltaTime;
-                    }
-
-
 
                 if (PlayerHP <= 0)
                 {

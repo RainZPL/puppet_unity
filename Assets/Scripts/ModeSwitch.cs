@@ -8,6 +8,8 @@ public class ModeSwitch : MonoBehaviour
     public GameLogic Logic;
     public GameObject pause;
     public int a = 1;
+    public GameObject countdown;
+    public GameObject hp;
 
     void OnSwitchButtonClicked() 
     {
@@ -28,12 +30,14 @@ public class ModeSwitch : MonoBehaviour
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = false;
             gameObject.GetComponent<Animator>().enabled = true;
+            hp.SetActive(true);
         }
         else
         {
             gameObject.GetComponent<FingerRotationDriver>().enabled = true;
             gameObject.GetComponent<Animator>().enabled = false;
             Time.timeScale = 1.0f;
+            hp.SetActive(false);
         }
     }
 }
