@@ -81,6 +81,32 @@ public class UIControl : MonoBehaviour
         isskiped = true;
     }
 
+    public void Restart() 
+    {
+        WinPannel.SetActive(false);
+        LostPannel.SetActive(false);
+        DrawPannel.SetActive(false);
+    }
+
+    public void Win() 
+    {
+        Time.timeScale = 0;
+        WinPannel.SetActive(true);
+        PauseUI.SetActive(false);
+    }
+    public void Lost()
+    {
+        Time.timeScale = 0;
+        LostPannel.SetActive(true);
+        PauseUI.SetActive(false);
+    }
+    public void Draw()
+    {
+        Time.timeScale = 0;
+        DrawPannel.SetActive(true);
+        PauseUI.SetActive(false);
+    }
+
     // Update is called once per frame
     void Update()
     {
@@ -105,25 +131,6 @@ public class UIControl : MonoBehaviour
             else
             {
                 CountDown.GetComponent<TextMeshProUGUI>().text = "Freeflow Play";
-            }
-
-            if (GameLogic.Win) 
-            {
-                Time.timeScale = 0;
-                WinPannel.SetActive(true);
-                PauseUI.SetActive(false);
-            }
-            if (GameLogic.Lost) 
-            {
-                Time.timeScale = 0;
-                LostPannel.SetActive(true);
-                PauseUI.SetActive(false);
-            }
-            if (GameLogic.Draw) 
-            {
-                Time.timeScale = 0;
-                DrawPannel.SetActive(true);
-                PauseUI.SetActive(false);
             }
         }
     }

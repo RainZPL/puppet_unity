@@ -2300,7 +2300,7 @@ MonoBehaviour:
   rightUpper: {fileID: 1206518770}
   rightFore: {fileID: 104892687}
   rightUpperAxis: {x: -1, y: 0, z: 0}
-  rightUpperMaxAngle: 90
+  rightUpperMaxAngle: 20
   rightForeAxis: {x: 0, y: 0, z: -1}
   rightForeMaxAngle: 90
   rightUpperMinAngle: -90
@@ -2310,7 +2310,7 @@ MonoBehaviour:
   leftUpper: {fileID: 335051408}
   leftFore: {fileID: 1176445678}
   leftUpperAxis: {x: -1, y: 0, z: 0}
-  leftUpperMaxAngle: 90
+  leftUpperMaxAngle: 20
   leftForeAxis: {x: 0, y: 0, z: 1}
   leftForeMaxAngle: 90
   leftUpperMinAngle: -90
@@ -2328,7 +2328,7 @@ MonoBehaviour:
   bodyYawAxis: {x: 0, y: 1, z: 0}
   bodyYawRange: 70
   bodyYawGain: 4
-  bodyAxisInWorldSpace: 0
+  bodyAxisInWorldSpace: 1
   smoothing: 12
 --- !u!82 &149278808
 AudioSource:
@@ -2689,7 +2689,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 8, y: -58}
+  m_AnchoredPosition: {x: 8, y: -68}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &180446689
@@ -5343,8 +5343,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
-  GestureValidationControllerOnnx: {fileID: 0}
-  GameLogic: {fileID: 0}
+  GestureValidationControllerOnnx: {fileID: 385042064}
+  GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 1949448578}
 --- !u!1 &483788580
 GameObject:
   m_ObjectHideFlags: 0
@@ -5487,8 +5488,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
-  GestureValidationControllerOnnx: {fileID: 0}
-  GameLogic: {fileID: 0}
+  GestureValidationControllerOnnx: {fileID: 385042064}
+  GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 1949448578}
 --- !u!114 &493938509
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7820,7 +7822,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 679, y: 869}
+  m_AnchoredPosition: {x: 679, y: 839}
   m_SizeDelta: {x: 600, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &716128068
@@ -7870,8 +7872,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 48
+  m_fontSizeBase: 48
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -13276,8 +13278,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
-  GestureValidationControllerOnnx: {fileID: 0}
-  GameLogic: {fileID: 0}
+  GestureValidationControllerOnnx: {fileID: 385042064}
+  GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 1949448578}
 --- !u!114 &1361512641
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16339,6 +16342,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Restart
   GestureValidationControllerOnnx: {fileID: 385042064}
   GameLogic: {fileID: 844792193}
+  UIControl: {fileID: 1949448578}
 --- !u!114 &1620129911
 MonoBehaviour:
   m_ObjectHideFlags: 0

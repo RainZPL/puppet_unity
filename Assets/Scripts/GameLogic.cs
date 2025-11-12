@@ -84,26 +84,20 @@ public class GameLogic : MonoBehaviour
 
                 if (PlayerHP <= 0)
                 {
-                    Win = false;
-                    Lost = true;
-                    Draw = false;
+                    UIControl.Lost();
                     PlayVideo = false;
                     Time.timeScale = 0;
                 }
                 
                 if (EnemyHP <= 0)
                 {
-                    Win = true;
-                    Lost = false;
-                    Draw = false;
+                    UIControl.Win();
                     PlayVideo = false;
                     Time.timeScale = 0;
                 }
                 if (PlayerHP > 0 && EnemyHP > 0 && GestureValidation.GetComponent<GestureValidationControllerOnnx>().currentGestureIndex>4) 
                 {
-                    Win = false;
-                    Lost = false;
-                    Draw = true;
+                    UIControl.Draw();
                     PlayVideo = false;
                     Time.timeScale = 0;
                 }
