@@ -2299,32 +2299,32 @@ MonoBehaviour:
   useRightHand: 1
   rightUpper: {fileID: 1206518770}
   rightFore: {fileID: 104892687}
-  rightUpperAxis: {x: 1, y: 0, z: 0}
+  rightUpperAxis: {x: -1, y: 0, z: 0}
   rightUpperMaxAngle: 90
-  rightForeAxis: {x: 1, y: 0, z: 0}
-  rightForeMaxAngle: 110
+  rightForeAxis: {x: 0, y: 0, z: -1}
+  rightForeMaxAngle: 90
   rightUpperMinAngle: -90
   rightForeMinAngle: 0
-  rightRaiseGain: 3.5
-  rightCurlGain: 1.2
+  rightRaiseGain: 5
+  rightCurlGain: 5
   leftUpper: {fileID: 335051408}
   leftFore: {fileID: 1176445678}
-  leftUpperAxis: {x: 1, y: 0, z: 0}
+  leftUpperAxis: {x: -1, y: 0, z: 0}
   leftUpperMaxAngle: 90
-  leftForeAxis: {x: 1, y: 0, z: 0}
-  leftForeMaxAngle: 110
+  leftForeAxis: {x: 0, y: 0, z: 1}
+  leftForeMaxAngle: 90
   leftUpperMinAngle: -90
   leftForeMinAngle: 0
-  leftRaiseGain: 3.5
-  leftCurlGain: 1.2
-  headBone: {fileID: 398225769}
-  headYawAxis: {x: 0, y: 1, z: 0}
-  headPitchAxis: {x: 1, y: 0, z: 0}
-  headYawRange: 45
-  headPitchRange: 30
+  leftRaiseGain: 5
+  leftCurlGain: 5
+  headBone: {fileID: 1005808068}
+  headYawAxis: {x: 0, y: 0, z: 1}
+  headPitchAxis: {x: -1, y: 0, z: 0}
+  headYawRange: 180
+  headPitchRange: 180
   headCurlAngle: 20
   headGain: 1
-  bodyRoot: {fileID: 1987444678}
+  bodyRoot: {fileID: 232245252}
   bodyYawAxis: {x: 0, y: 1, z: 0}
   bodyYawRange: 70
   bodyYawGain: 4
@@ -2957,6 +2957,11 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 213133481}
   m_Mesh: {fileID: 4060445413370775677, guid: c39841b667332c643ae3a9cc9e80055d, type: 3}
+--- !u!4 &232245252 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -2525213446790289079, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
+  m_PrefabInstance: {fileID: 96095475}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &248513988
 GameObject:
   m_ObjectHideFlags: 0
@@ -3593,6 +3598,7 @@ Transform:
   - {fileID: 1837958892}
   - {fileID: 716128067}
   - {fileID: 1618524211}
+  - {fileID: 1939227188}
   - {fileID: 1114648934}
   m_Father: {fileID: 1949448579}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4243,11 +4249,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 385938994}
   m_CullTransparentMesh: 1
---- !u!4 &398225769 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -3052476751237913372, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
-  m_PrefabInstance: {fileID: 96095475}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &400567353
 GameObject:
   m_ObjectHideFlags: 0
@@ -5342,6 +5343,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
+  GestureValidationControllerOnnx: {fileID: 0}
+  GameLogic: {fileID: 0}
 --- !u!1 &483788580
 GameObject:
   m_ObjectHideFlags: 0
@@ -5484,6 +5487,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
+  GestureValidationControllerOnnx: {fileID: 0}
+  GameLogic: {fileID: 0}
 --- !u!114 &493938509
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6253,6 +6258,142 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 543458354}
   m_Mesh: {fileID: -5738419919006698848, guid: fa3f9a602a8bcb44eadac714f1c3b863, type: 3}
+--- !u!1 &559440071
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 559440072}
+  - component: {fileID: 559440074}
+  - component: {fileID: 559440073}
+  m_Layer: 5
+  m_Name: Text (TMP)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &559440072
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559440071}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1939227188}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 9.55, y: -11.9}
+  m_SizeDelta: {x: 217.7, y: 45.6}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &559440073
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559440071}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: Quit
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 36
+  m_fontSizeBase: 36
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 0
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 256
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &559440074
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559440071}
+  m_CullTransparentMesh: 1
 --- !u!1 &564426966
 GameObject:
   m_ObjectHideFlags: 0
@@ -7679,7 +7820,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 679, y: 713}
+  m_AnchoredPosition: {x: 679, y: 869}
   m_SizeDelta: {x: 600, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &716128068
@@ -10096,6 +10237,11 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 995296804}
   m_Mesh: {fileID: -3792099150818835391, guid: 4a31c47b61408544a93e0845e58880d9, type: 3}
+--- !u!4 &1005808068 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -2444406315379408139, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
+  m_PrefabInstance: {fileID: 96095475}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1006507203
 GameObject:
   m_ObjectHideFlags: 0
@@ -13130,6 +13276,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
+  GestureValidationControllerOnnx: {fileID: 0}
+  GameLogic: {fileID: 0}
 --- !u!114 &1361512641
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14493,6 +14641,78 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1475723313}
   m_Mesh: {fileID: 6068538823938138496, guid: fa3f9a602a8bcb44eadac714f1c3b863, type: 3}
+--- !u!1 &1485530729
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1485530730}
+  - component: {fileID: 1485530732}
+  - component: {fileID: 1485530731}
+  m_Layer: 5
+  m_Name: RawImage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1485530730
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485530729}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1939227188}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.54, y: -9.2}
+  m_SizeDelta: {x: 280.27, y: 136.2}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1485530731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485530729}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Texture: {fileID: 2800000, guid: f650b8aa5435b8045b3e9287ae18f417, type: 3}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+--- !u!222 &1485530732
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485530729}
+  m_CullTransparentMesh: 1
 --- !u!1 &1488051695
 GameObject:
   m_ObjectHideFlags: 0
@@ -15980,7 +16200,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 702.4, y: 832}
+  m_AnchoredPosition: {x: 1468, y: 832}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1618524212
@@ -16117,6 +16337,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecae146901b91b447bd09fb10b175b5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Restart
+  GestureValidationControllerOnnx: {fileID: 385042064}
+  GameLogic: {fileID: 844792193}
 --- !u!114 &1620129911
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19640,6 +19862,153 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1938127682}
   m_Mesh: {fileID: 2443904453477644371, guid: 6272a4797bf2df84286aa94db68a2bef, type: 3}
+--- !u!1 &1939227187
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1939227188}
+  - component: {fileID: 1939227192}
+  - component: {fileID: 1939227191}
+  - component: {fileID: 1939227190}
+  - component: {fileID: 1939227189}
+  m_Layer: 5
+  m_Name: Exit
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1939227188
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939227187}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -10.9106}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1485530730}
+  - {fileID: 559440072}
+  m_Father: {fileID: 314107228}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 1468, y: 711}
+  m_SizeDelta: {x: 160, y: 30}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1939227189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939227187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 829ac7c46f430ff43b5c5222f495e9ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Quit
+--- !u!114 &1939227190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939227187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 1
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 1939227191}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1939227189}
+        m_TargetAssemblyTypeName: Quit, Assembly-CSharp
+        m_MethodName: OnButtonClick
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+--- !u!114 &1939227191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939227187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1939227192
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939227187}
+  m_CullTransparentMesh: 1
 --- !u!1 &1949448577
 GameObject:
   m_ObjectHideFlags: 0
@@ -20225,11 +20594,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1986969757}
   m_Mesh: {fileID: 6068538823938138496, guid: fa3f9a602a8bcb44eadac714f1c3b863, type: 3}
---- !u!4 &1987444678 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -1889102022304547840, guid: 773da026a82c50f4c9a8ac8e14ea7772, type: 3}
-  m_PrefabInstance: {fileID: 96095475}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2015613894
 GameObject:
   m_ObjectHideFlags: 0
@@ -21562,54 +21926,85 @@ PrefabInstance:
       objectReference: {fileID: 32900000, guid: 04456fbc10a4d78428b01da71af69afc, type: 3}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[0].displayText
-      value: "Turn Around: \n\nPlace the thumb against the index finger and slide
-        it forward to make the Monkey King turn naturally. For the opposite direction,
-        slide the thumb backward.\nNote: Keep the index finger still and maintain
-        consistent motion throughout.\n"
+      value: 'Turn Around----Easy Gesture
+
+
+        Place the thumb against the index
+        finger and slide it forward to make the Monkey King turn naturally. For the
+        opposite direction, slide the thumb backward.
+
+        Note: Keep the index
+        finger still and maintain consistent motion throughout.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[1].displayText
-      value: "Bow: \n\nExtend the thumb and the three fingers in a forward pinch,
-        then press downward while slightly lowering the wrist and index finger. Lift
-        the hand to the start position afterward.\nNote: 1. Avoid any head movement
-        during the downward motion. 2. Keep the wrist and index finger movement controlled
-        and minimal.\n"
+      value: 'Bow----Easy Gesture
+
+
+        Extend the thumb and the three fingers
+        in a forward pinch, then press downward while slightly lowering the wrist
+        and index finger. Lift the hand to the start position afterward.
+
+        Note:
+        1. Avoid any head movement during the downward motion. 2. Keep the wrist
+        and index finger movement controlled and minimal.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[2].displayText
-      value: 'Turn Head:
+      value: 'Turn Head----Easy Gesture
 
 
-        Extend the thumb and middle finger downward in
-        quick alternation, making the head move side to side with small, rapid motions.
+        Extend the thumb and middle finger
+        downward in quick alternation, making the head move side to side with small,
+        rapid motions.
 
-        Note:
-        Keep the pressure from the thumb and middle finger even throughout the movement.
+        Note: Keep the pressure from the thumb and middle
+        finger even throughout the movement.
 
 '
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[3].displayText
-      value: "Sword Dance: \n\nPlace the thumb against the index finger and keep
-        the other three fingers together. Swing and rotate the fingers resembling
-        the shape of \u201C\u221E\u201D. During the movement, allow the wrist to
-        follow with corresponding rotation.\r\nNote: 1. Ensure that the fingers rotate
-        both forward and backward while swinging. 2. Avoid excessive wrist movement,
-        which may cause Monkey King to tilt to one side.\r\n"
+      value: "Sword Dance----Difficult Gesture\n\nPlace the thumb against the index
+        finger and keep the other three fingers together. Swing and rotate the fingers
+        resembling the shape of \u201C\u221E\u201D. During the movement, allow the
+        wrist to follow with corresponding rotation.\r\nNote: 1. Ensure that the
+        fingers rotate both forward and backward while swinging. 2. Avoid excessive
+        wrist movement, which may cause Monkey King to tilt to one side.\r\n"
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[4].displayText
-      value: "Punch: \n\nCurl the thumb and three fingers backward, then extend them
-        forcefully forward while slightly rotating the wrist in the direction of
-        the punch.\nNote: Apply sufficient strength during the punch but maintain
-        control of the wrist to ensure proper direction and stability.\n"
+      value: 'Punch----Difficult Gesture
+
+
+        Curl the thumb and three fingers
+        backward, then extend them forcefully forward while slightly rotating the
+        wrist in the direction of the punch.
+
+        Note: Apply sufficient strength
+        during the punch but maintain control of the wrist to ensure proper direction
+        and stability.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 6337879089581075612, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: mediaQueue.Array.data[5].displayText
-      value: "Punch: \n\nCurl the thumb and three fingers backward, then extend them
-        forcefully forward while slightly rotating the wrist in the direction of
-        the punch.\nNote: Apply sufficient strength during the punch but maintain
-        control of the wrist to ensure proper direction and stability.\n"
+      value: 'Punch----Difficult Gesture
+
+
+        Curl the thumb and three fingers
+        backward, then extend them forcefully forward while slightly rotating the
+        wrist in the direction of the punch.
+
+        Note: Apply sufficient strength
+        during the punch but maintain control of the wrist to ensure proper direction
+        and stability.
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 8846909172322919692, guid: b3995dae4f79b6c48bbee2c442aa260e, type: 3}
       propertyPath: m_AnchoredPosition.x
