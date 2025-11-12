@@ -435,6 +435,56 @@ namespace HandControl
             StartAutoTesting();
         }
 
+        /// <summary>
+        /// 重置动作索引为第一个动作，从头开始测试
+        /// </summary>
+        public void ResetToFirstGesture()
+        {
+            Debug.Log("Resetting to first gesture...");
+
+            // 停止当前测试
+            StopTesting();
+
+            // 重置所有状态变量
+            currentGestureIndex = -1;
+            gesturePassed = false;
+            isTimeout = false;
+            skipCurrentGesture = false;
+            isPlayingAnimation = false;
+            collecting = false;
+            hasRecognizedCurrentGesture = false;
+            isRetryingGesture = false;
+            currentRetryCount = 0;
+
+            // 清空缓冲区
+            frameBuffer.Clear();
+            timeBuffer.Clear();
+            activeLabel = null;
+
+            // 重置UI显示
+            progressText = "Idle";
+            resultText = "Result: --";
+
+            Debug.Log("Reset completed. Ready to start from first gesture.");
+        }
+
+        /// <summary>
+        /// 重置动作索引为第一个动作并立即开始测试
+        /// </summary>
+        public void ResetAndStartTesting()
+        {
+            ResetToFirstGesture();
+
+            if (gestures.Count > 0)
+            {
+                StartAutoTesting();
+            }
+            else
+            {
+                Debug.LogWarning("No gestures configured, cannot start testing");
+            }
+        }
+
         public void SkipCurrentGesture()
         {
             if (!isTesting || !collecting) return;

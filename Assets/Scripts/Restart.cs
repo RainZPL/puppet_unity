@@ -1,9 +1,15 @@
+using HandControl;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class Restart : MonoBehaviour
-{    public void OnButtonClick()
+
+{
+    public GestureValidationControllerOnnx GestureValidationControllerOnnx;
+    public GameLogic GameLogic;
+    public void OnButtonClick()
     {
-        SceneManager.LoadScene("test3");
+        GestureValidationControllerOnnx.ResetAndStartTesting();
+        GameLogic.Pause();
     }
 }

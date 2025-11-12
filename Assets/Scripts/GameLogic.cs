@@ -61,6 +61,12 @@ public class GameLogic : MonoBehaviour
         PlayVideo = true;
     }
 
+    public void Pause() 
+    {
+        PlayVideo = true;
+        Time.timeScale = 0;
+    }
+
     // Update is called once per frame
     void Update()
     {
@@ -70,8 +76,7 @@ public class GameLogic : MonoBehaviour
             {
                 if (Input.GetKeyDown(KeyCode.P))
                 {
-                    PlayVideo = true;
-                    Time.timeScale = 0;
+                    Pause();
                 }
 
                 FreeEnd = true;
